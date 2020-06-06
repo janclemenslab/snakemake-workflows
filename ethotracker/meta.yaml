@@ -1,0 +1,6 @@
+name: ethotracker
+description: Track flies in video. For more information see source code https://github.com/janclemenslab/ethotracker.
+input:
+  - video files (.mp4)
+output:
+  - tracks file (*_tracks.h5)
