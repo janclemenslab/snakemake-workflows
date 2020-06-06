@@ -1,0 +1,9 @@
+name: deepss
+channels:
+  - defaults
+dependencies:
+  - python=3.7
+  - tensorflow>=2
+  - zarr
+  - pip:
+    - git+https://github.com/janclemenslab/deepsongsegmenter

@@ -1,0 +1,18 @@
+name: deepposekit
+channels:
+  - defaults
+dependencies:
+  - python=3.7
+  - opencv
+  - tensorflow=1.15
+  - pandas
+  - zarr
+  - xarray
+  - pip:
+    - xarray-behave
+    - pyvideoreader
+    - flammkuchen
+    - git+https://github.com/jgraving/DeepPoseKit.git@v0.1.1.dev  # deepposekit==0.1.1.dev0
+    - git+https://github.com/janclemenslab/leap_utils   # leap-utils==0.1
+    - git+https://github.com/janclemenslab/xarray-behave  # xarray-behave
+

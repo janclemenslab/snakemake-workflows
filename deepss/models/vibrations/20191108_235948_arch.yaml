@@ -1,0 +1,3161 @@
+backend: tensorflow
+class_name: Model
+config:
+  input_layers:
+  - - input_1
+    - 0
+    - 0
+  layers:
+  - class_name: InputLayer
+    config:
+      batch_input_shape: !!python/tuple
+      - null
+      - 4096
+      - 16
+      dtype: float32
+      name: input_1
+      sparse: false
+    inbound_nodes: []
+    name: input_1
+  - class_name: Conv1D
+    config:
+      activation: linear
+      activity_regularizer: null
+      bias_constraint: null
+      bias_initializer:
+        class_name: Zeros
+        config: {}
+      bias_regularizer: null
+      data_format: channels_last
+      dilation_rate: !!python/tuple
+      - 1
+      dtype: float32
+      filters: 48
+      kernel_constraint: null
+      kernel_initializer:
+        class_name: GlorotUniform
+        config:
+          seed: null
+      kernel_regularizer: null
+      kernel_size: !!python/tuple
+      - 1
+      name: tcn_initial_conv
+      padding: same
+      strides: !!python/tuple
+      - 1
+      trainable: true
+      use_bias: true
+    inbound_nodes:
+    - - - input_1
+        - 0
+        - 0
+        - {}
+    name: tcn_initial_conv
+  - class_name: Conv1D
+    config:
+      activation: linear
+      activity_regularizer: null
+      bias_constraint: null
+      bias_initializer:
+        class_name: Zeros
+        config: {}
+      bias_regularizer: null
+      data_format: channels_last
+      dilation_rate: !!python/tuple
+      - 1
+      dtype: float32
+      filters: 48
+      kernel_constraint: null
+      kernel_initializer:
+        class_name: GlorotUniform
+        config:
+          seed: null
+      kernel_regularizer: null
+      kernel_size: !!python/tuple
+      - 32
+      name: tcn_dilated_conv_1_tanh_s0
+      padding: same
+      strides: !!python/tuple
+      - 1
+      trainable: true
+      use_bias: true
+    inbound_nodes:
+    - - - tcn_initial_conv
+        - 0
+        - 0
+        - {}
+    name: tcn_dilated_conv_1_tanh_s0
+  - class_name: Activation
+    config:
+      activation: relu
+      dtype: float32
+      name: activation
+      trainable: true
+    inbound_nodes:
+    - - - tcn_dilated_conv_1_tanh_s0
+        - 0
+        - 0
+        - {}
+    name: activation
+  - class_name: Lambda
+    config:
+      arguments: !!python/object/apply:builtins.dict
+      - {}
+      dtype: float32
+      function: !!python/tuple
+      - '4wEAAAAAAAAAAwAAAAUAAABDAAAAcyYAAAB0AGoBdACgAnwAoQFkAWQCZAONA2QEFwB9AXwAfAEb
+
+        AH0CfAJTACkF+vMgTm9ybWFsaXplIGEgbGF5ZXIgdG8gdGhlIG1heGltdW0gYWN0aXZhdGlvbgoK
+
+        ICAgIFRoaXMga2VlcHMgYSBsYXllcnMgdmFsdWVzIGJldHdlZW4gemVybyBhbmQgb25lLgogICAg
+
+        SXQgaGVscHMgd2l0aCByZWx1J3MgdW5ib3VuZGVkIGFjdGl2YXRpb24KCiAgICBBcmdzOgogICAg
+
+        ICAgIHg6IFRoZSBsYXllciB0byBub3JtYWxpemUKCiAgICBSZXR1cm5zOgogICAgICAgIEEgbWF4
+
+        aW1hbCBub3JtYWxpemVkIGxheWVyCiAgICDpAgAAAFQpAdoIa2VlcGRpbXNn8WjjiLX45D4pA9oB
+
+        S9oDbWF42gNhYnMpA9oBeFoKbWF4X3ZhbHVlc9oDb3V0qQByCQAAAPoqL3NjcmF0Y2gyL2NsZW1l
+
+        bnMxMC9kc3Mvc3JjL2Rzcy90Y24vdGNuLnB52hVjaGFubmVsX25vcm1hbGl6YXRpb24OAAAAcwYA
+
+        AAAADRoBCAE=
+
+        '
+      - null
+      - null
+      function_type: lambda
+      module: dss.tcn.tcn
+      name: lambda
+      output_shape: null
+      output_shape_module: null
+      output_shape_type: raw
+      trainable: true
+    inbound_nodes:
+    - - - activation
+        - 0
+        - 0
+        - {}
+    name: lambda
+  - class_name: SpatialDropout1D
+    config:
+      dtype: float32
+      name: tcn_spatial_dropout1d_1_s0_0.000000
+      noise_shape: null
+      rate: 0.0
+      seed: null
+      trainable: true
+    inbound_nodes:
+    - - - lambda
+        - 0
+        - 0
+        - {}
+    name: tcn_spatial_dropout1d_1_s0_0.000000
+  - class_name: Conv1D
+    config:
+      activation: linear
+      activity_regularizer: null
+      bias_constraint: null
+      bias_initializer:
+        class_name: Zeros
+        config: {}
+      bias_regularizer: null
+      data_format: channels_last
+      dilation_rate: !!python/tuple
+      - 1
+      dtype: float32
+      filters: 48
+      kernel_constraint: null
+      kernel_initializer:
+        class_name: GlorotUniform
+        config:
+          seed: null
+      kernel_regularizer: null
+      kernel_size: !!python/tuple
+      - 1
+      name: conv1d
+      padding: same
+      strides: !!python/tuple
+      - 1
+      trainable: true
+      use_bias: true
+    inbound_nodes:
+    - - - tcn_spatial_dropout1d_1_s0_0.000000
+        - 0
+        - 0
+        - {}
+    name: conv1d
+  - class_name: Add
+    config:
+      dtype: float32
+      name: add
+      trainable: true
+    inbound_nodes:
+    - - - tcn_initial_conv
+        - 0
+        - 0
+        - &id001 {}
+      - - conv1d
+        - 0
+        - 0
+        - *id001
+    name: add
+  - class_name: Conv1D
+    config:
+      activation: linear
+      activity_regularizer: null
+      bias_constraint: null
+      bias_initializer:
+        class_name: Zeros
+        config: {}
+      bias_regularizer: null
+      data_format: channels_last
+      dilation_rate: !!python/tuple
+      - 2
+      dtype: float32
+      filters: 48
+      kernel_constraint: null
+      kernel_initializer:
+        class_name: GlorotUniform
+        config:
+          seed: null
+      kernel_regularizer: null
+      kernel_size: !!python/tuple
+      - 32
+      name: tcn_dilated_conv_2_tanh_s0
+      padding: same
+      strides: !!python/tuple
+      - 1
+      trainable: true
+      use_bias: true
+    inbound_nodes:
+    - - - add
+        - 0
+        - 0
+        - {}
+    name: tcn_dilated_conv_2_tanh_s0
+  - class_name: Activation
+    config:
+      activation: relu
+      dtype: float32
+      name: activation_1
+      trainable: true
+    inbound_nodes:
+    - - - tcn_dilated_conv_2_tanh_s0
+        - 0
+        - 0
+        - {}
+    name: activation_1
+  - class_name: Lambda
+    config:
+      arguments: !!python/object/apply:builtins.dict
+      - {}
+      dtype: float32
+      function: !!python/tuple
+      - '4wEAAAAAAAAAAwAAAAUAAABDAAAAcyYAAAB0AGoBdACgAnwAoQFkAWQCZAONA2QEFwB9AXwAfAEb
+
+        AH0CfAJTACkF+vMgTm9ybWFsaXplIGEgbGF5ZXIgdG8gdGhlIG1heGltdW0gYWN0aXZhdGlvbgoK
+
+        ICAgIFRoaXMga2VlcHMgYSBsYXllcnMgdmFsdWVzIGJldHdlZW4gemVybyBhbmQgb25lLgogICAg
+
+        SXQgaGVscHMgd2l0aCByZWx1J3MgdW5ib3VuZGVkIGFjdGl2YXRpb24KCiAgICBBcmdzOgogICAg
+
+        ICAgIHg6IFRoZSBsYXllciB0byBub3JtYWxpemUKCiAgICBSZXR1cm5zOgogICAgICAgIEEgbWF4
+
+        aW1hbCBub3JtYWxpemVkIGxheWVyCiAgICDpAgAAAFQpAdoIa2VlcGRpbXNn8WjjiLX45D4pA9oB
+
+        S9oDbWF42gNhYnMpA9oBeFoKbWF4X3ZhbHVlc9oDb3V0qQByCQAAAPoqL3NjcmF0Y2gyL2NsZW1l
+
+        bnMxMC9kc3Mvc3JjL2Rzcy90Y24vdGNuLnB52hVjaGFubmVsX25vcm1hbGl6YXRpb24OAAAAcwYA
+
+        AAAADRoBCAE=
+
+        '
+      - null
+      - null
+      function_type: lambda
+      module: dss.tcn.tcn
+      name: lambda_1
+      output_shape: null
+      output_shape_module: null
+      output_shape_type: raw
+      trainable: true
+    inbound_nodes:
+    - - - activation_1
+        - 0
+        - 0
+        - {}
+    name: lambda_1
+  - class_name: SpatialDropout1D
+    config:
+      dtype: float32
+      name: tcn_spatial_dropout1d_2_s0_0.000000
+      noise_shape: null
+      rate: 0.0
+      seed: null
+      trainable: true
+    inbound_nodes:
+    - - - lambda_1
+        - 0
+        - 0
+        - {}
+    name: tcn_spatial_dropout1d_2_s0_0.000000
+  - class_name: Conv1D
+    config:
+      activation: linear
+      activity_regularizer: null
+      bias_constraint: null
+      bias_initializer:
+        class_name: Zeros
+        config: {}
+      bias_regularizer: null
+      data_format: channels_last
+      dilation_rate: !!python/tuple
+      - 1
+      dtype: float32
+      filters: 48
+      kernel_constraint: null
+      kernel_initializer:
+        class_name: GlorotUniform
+        config:
+          seed: null
+      kernel_regularizer: null
+      kernel_size: !!python/tuple
+      - 1
+      name: conv1d_1
+      padding: same
+      strides: !!python/tuple
+      - 1
+      trainable: true
+      use_bias: true
+    inbound_nodes:
+    - - - tcn_spatial_dropout1d_2_s0_0.000000
+        - 0
+        - 0
+        - {}
+    name: conv1d_1
+  - class_name: Add
+    config:
+      dtype: float32
+      name: add_1
+      trainable: true
+    inbound_nodes:
+    - - - add
+        - 0
+        - 0
+        - &id002 {}
+      - - conv1d_1
+        - 0
+        - 0
+        - *id002
+    name: add_1
+  - class_name: Conv1D
+    config:
+      activation: linear
+      activity_regularizer: null
+      bias_constraint: null
+      bias_initializer:
+        class_name: Zeros
+        config: {}
+      bias_regularizer: null
+      data_format: channels_last
+      dilation_rate: !!python/tuple
+      - 4
+      dtype: float32
+      filters: 48
+      kernel_constraint: null
+      kernel_initializer:
+        class_name: GlorotUniform
+        config:
+          seed: null
+      kernel_regularizer: null
+      kernel_size: !!python/tuple
+      - 32
+      name: tcn_dilated_conv_4_tanh_s0
+      padding: same
+      strides: !!python/tuple
+      - 1
+      trainable: true
+      use_bias: true
+    inbound_nodes:
+    - - - add_1
+        - 0
+        - 0
+        - {}
+    name: tcn_dilated_conv_4_tanh_s0
+  - class_name: Activation
+    config:
+      activation: relu
+      dtype: float32
+      name: activation_2
+      trainable: true
+    inbound_nodes:
+    - - - tcn_dilated_conv_4_tanh_s0
+        - 0
+        - 0
+        - {}
+    name: activation_2
+  - class_name: Lambda
+    config:
+      arguments: !!python/object/apply:builtins.dict
+      - {}
+      dtype: float32
+      function: !!python/tuple
+      - '4wEAAAAAAAAAAwAAAAUAAABDAAAAcyYAAAB0AGoBdACgAnwAoQFkAWQCZAONA2QEFwB9AXwAfAEb
+
+        AH0CfAJTACkF+vMgTm9ybWFsaXplIGEgbGF5ZXIgdG8gdGhlIG1heGltdW0gYWN0aXZhdGlvbgoK
+
+        ICAgIFRoaXMga2VlcHMgYSBsYXllcnMgdmFsdWVzIGJldHdlZW4gemVybyBhbmQgb25lLgogICAg
+
+        SXQgaGVscHMgd2l0aCByZWx1J3MgdW5ib3VuZGVkIGFjdGl2YXRpb24KCiAgICBBcmdzOgogICAg
+
+        ICAgIHg6IFRoZSBsYXllciB0byBub3JtYWxpemUKCiAgICBSZXR1cm5zOgogICAgICAgIEEgbWF4
+
+        aW1hbCBub3JtYWxpemVkIGxheWVyCiAgICDpAgAAAFQpAdoIa2VlcGRpbXNn8WjjiLX45D4pA9oB
+
+        S9oDbWF42gNhYnMpA9oBeFoKbWF4X3ZhbHVlc9oDb3V0qQByCQAAAPoqL3NjcmF0Y2gyL2NsZW1l
+
+        bnMxMC9kc3Mvc3JjL2Rzcy90Y24vdGNuLnB52hVjaGFubmVsX25vcm1hbGl6YXRpb24OAAAAcwYA
+
+        AAAADRoBCAE=
+
+        '
+      - null
+      - null
+      function_type: lambda
+      module: dss.tcn.tcn
+      name: lambda_2
+      output_shape: null
+      output_shape_module: null
+      output_shape_type: raw
+      trainable: true
+    inbound_nodes:
+    - - - activation_2
+        - 0
+        - 0
+        - {}
+    name: lambda_2
+  - class_name: SpatialDropout1D
+    config:
+      dtype: float32
+      name: tcn_spatial_dropout1d_4_s0_0.000000
+      noise_shape: null
+      rate: 0.0
+      seed: null
+      trainable: true
+    inbound_nodes:
+    - - - lambda_2
+        - 0
+        - 0
+        - {}
+    name: tcn_spatial_dropout1d_4_s0_0.000000
+  - class_name: Conv1D
+    config:
+      activation: linear
+      activity_regularizer: null
+      bias_constraint: null
+      bias_initializer:
+        class_name: Zeros
+        config: {}
+      bias_regularizer: null
+      data_format: channels_last
+      dilation_rate: !!python/tuple
+      - 1
+      dtype: float32
+      filters: 48
+      kernel_constraint: null
+      kernel_initializer:
+        class_name: GlorotUniform
+        config:
+          seed: null
+      kernel_regularizer: null
+      kernel_size: !!python/tuple
+      - 1
+      name: conv1d_2
+      padding: same
+      strides: !!python/tuple
+      - 1
+      trainable: true
+      use_bias: true
+    inbound_nodes:
+    - - - tcn_spatial_dropout1d_4_s0_0.000000
+        - 0
+        - 0
+        - {}
+    name: conv1d_2
+  - class_name: Add
+    config:
+      dtype: float32
+      name: add_2
+      trainable: true
+    inbound_nodes:
+    - - - add_1
+        - 0
+        - 0
+        - &id003 {}
+      - - conv1d_2
+        - 0
+        - 0
+        - *id003
+    name: add_2
+  - class_name: Conv1D
+    config:
+      activation: linear
+      activity_regularizer: null
+      bias_constraint: null
+      bias_initializer:
+        class_name: Zeros
+        config: {}
+      bias_regularizer: null
+      data_format: channels_last
+      dilation_rate: !!python/tuple
+      - 8
+      dtype: float32
+      filters: 48
+      kernel_constraint: null
+      kernel_initializer:
+        class_name: GlorotUniform
+        config:
+          seed: null
+      kernel_regularizer: null
+      kernel_size: !!python/tuple
+      - 32
+      name: tcn_dilated_conv_8_tanh_s0
+      padding: same
+      strides: !!python/tuple
+      - 1
+      trainable: true
+      use_bias: true
+    inbound_nodes:
+    - - - add_2
+        - 0
+        - 0
+        - {}
+    name: tcn_dilated_conv_8_tanh_s0
+  - class_name: Activation
+    config:
+      activation: relu
+      dtype: float32
+      name: activation_3
+      trainable: true
+    inbound_nodes:
+    - - - tcn_dilated_conv_8_tanh_s0
+        - 0
+        - 0
+        - {}
+    name: activation_3
+  - class_name: Lambda
+    config:
+      arguments: !!python/object/apply:builtins.dict
+      - {}
+      dtype: float32
+      function: !!python/tuple
+      - '4wEAAAAAAAAAAwAAAAUAAABDAAAAcyYAAAB0AGoBdACgAnwAoQFkAWQCZAONA2QEFwB9AXwAfAEb
+
+        AH0CfAJTACkF+vMgTm9ybWFsaXplIGEgbGF5ZXIgdG8gdGhlIG1heGltdW0gYWN0aXZhdGlvbgoK
+
+        ICAgIFRoaXMga2VlcHMgYSBsYXllcnMgdmFsdWVzIGJldHdlZW4gemVybyBhbmQgb25lLgogICAg
+
+        SXQgaGVscHMgd2l0aCByZWx1J3MgdW5ib3VuZGVkIGFjdGl2YXRpb24KCiAgICBBcmdzOgogICAg
+
+        ICAgIHg6IFRoZSBsYXllciB0byBub3JtYWxpemUKCiAgICBSZXR1cm5zOgogICAgICAgIEEgbWF4
+
+        aW1hbCBub3JtYWxpemVkIGxheWVyCiAgICDpAgAAAFQpAdoIa2VlcGRpbXNn8WjjiLX45D4pA9oB
+
+        S9oDbWF42gNhYnMpA9oBeFoKbWF4X3ZhbHVlc9oDb3V0qQByCQAAAPoqL3NjcmF0Y2gyL2NsZW1l
+
+        bnMxMC9kc3Mvc3JjL2Rzcy90Y24vdGNuLnB52hVjaGFubmVsX25vcm1hbGl6YXRpb24OAAAAcwYA
+
+        AAAADRoBCAE=
+
+        '
+      - null
+      - null
+      function_type: lambda
+      module: dss.tcn.tcn
+      name: lambda_3
+      output_shape: null
+      output_shape_module: null
+      output_shape_type: raw
+      trainable: true
+    inbound_nodes:
+    - - - activation_3
+        - 0
+        - 0
+        - {}
+    name: lambda_3
+  - class_name: SpatialDropout1D
+    config:
+      dtype: float32
+      name: tcn_spatial_dropout1d_8_s0_0.000000
+      noise_shape: null
+      rate: 0.0
+      seed: null
+      trainable: true
+    inbound_nodes:
+    - - - lambda_3
+        - 0
+        - 0
+        - {}
+    name: tcn_spatial_dropout1d_8_s0_0.000000
+  - class_name: Conv1D
+    config:
+      activation: linear
+      activity_regularizer: null
+      bias_constraint: null
+      bias_initializer:
+        class_name: Zeros
+        config: {}
+      bias_regularizer: null
+      data_format: channels_last
+      dilation_rate: !!python/tuple
+      - 1
+      dtype: float32
+      filters: 48
+      kernel_constraint: null
+      kernel_initializer:
+        class_name: GlorotUniform
+        config:
+          seed: null
+      kernel_regularizer: null
+      kernel_size: !!python/tuple
+      - 1
+      name: conv1d_3
+      padding: same
+      strides: !!python/tuple
+      - 1
+      trainable: true
+      use_bias: true
+    inbound_nodes:
+    - - - tcn_spatial_dropout1d_8_s0_0.000000
+        - 0
+        - 0
+        - {}
+    name: conv1d_3
+  - class_name: Add
+    config:
+      dtype: float32
+      name: add_3
+      trainable: true
+    inbound_nodes:
+    - - - add_2
+        - 0
+        - 0
+        - &id004 {}
+      - - conv1d_3
+        - 0
+        - 0
+        - *id004
+    name: add_3
+  - class_name: Conv1D
+    config:
+      activation: linear
+      activity_regularizer: null
+      bias_constraint: null
+      bias_initializer:
+        class_name: Zeros
+        config: {}
+      bias_regularizer: null
+      data_format: channels_last
+      dilation_rate: !!python/tuple
+      - 16
+      dtype: float32
+      filters: 48
+      kernel_constraint: null
+      kernel_initializer:
+        class_name: GlorotUniform
+        config:
+          seed: null
+      kernel_regularizer: null
+      kernel_size: !!python/tuple
+      - 32
+      name: tcn_dilated_conv_16_tanh_s0
+      padding: same
+      strides: !!python/tuple
+      - 1
+      trainable: true
+      use_bias: true
+    inbound_nodes:
+    - - - add_3
+        - 0
+        - 0
+        - {}
+    name: tcn_dilated_conv_16_tanh_s0
+  - class_name: Activation
+    config:
+      activation: relu
+      dtype: float32
+      name: activation_4
+      trainable: true
+    inbound_nodes:
+    - - - tcn_dilated_conv_16_tanh_s0
+        - 0
+        - 0
+        - {}
+    name: activation_4
+  - class_name: Lambda
+    config:
+      arguments: !!python/object/apply:builtins.dict
+      - {}
+      dtype: float32
+      function: !!python/tuple
+      - '4wEAAAAAAAAAAwAAAAUAAABDAAAAcyYAAAB0AGoBdACgAnwAoQFkAWQCZAONA2QEFwB9AXwAfAEb
+
+        AH0CfAJTACkF+vMgTm9ybWFsaXplIGEgbGF5ZXIgdG8gdGhlIG1heGltdW0gYWN0aXZhdGlvbgoK
+
+        ICAgIFRoaXMga2VlcHMgYSBsYXllcnMgdmFsdWVzIGJldHdlZW4gemVybyBhbmQgb25lLgogICAg
+
+        SXQgaGVscHMgd2l0aCByZWx1J3MgdW5ib3VuZGVkIGFjdGl2YXRpb24KCiAgICBBcmdzOgogICAg
+
+        ICAgIHg6IFRoZSBsYXllciB0byBub3JtYWxpemUKCiAgICBSZXR1cm5zOgogICAgICAgIEEgbWF4
+
+        aW1hbCBub3JtYWxpemVkIGxheWVyCiAgICDpAgAAAFQpAdoIa2VlcGRpbXNn8WjjiLX45D4pA9oB
+
+        S9oDbWF42gNhYnMpA9oBeFoKbWF4X3ZhbHVlc9oDb3V0qQByCQAAAPoqL3NjcmF0Y2gyL2NsZW1l
+
+        bnMxMC9kc3Mvc3JjL2Rzcy90Y24vdGNuLnB52hVjaGFubmVsX25vcm1hbGl6YXRpb24OAAAAcwYA
+
+        AAAADRoBCAE=
+
+        '
+      - null
+      - null
+      function_type: lambda
+      module: dss.tcn.tcn
+      name: lambda_4
+      output_shape: null
+      output_shape_module: null
+      output_shape_type: raw
+      trainable: true
+    inbound_nodes:
+    - - - activation_4
+        - 0
+        - 0
+        - {}
+    name: lambda_4
+  - class_name: SpatialDropout1D
+    config:
+      dtype: float32
+      name: tcn_spatial_dropout1d_16_s0_0.000000
+      noise_shape: null
+      rate: 0.0
+      seed: null
+      trainable: true
+    inbound_nodes:
+    - - - lambda_4
+        - 0
+        - 0
+        - {}
+    name: tcn_spatial_dropout1d_16_s0_0.000000
+  - class_name: Conv1D
+    config:
+      activation: linear
+      activity_regularizer: null
+      bias_constraint: null
+      bias_initializer:
+        class_name: Zeros
+        config: {}
+      bias_regularizer: null
+      data_format: channels_last
+      dilation_rate: !!python/tuple
+      - 1
+      dtype: float32
+      filters: 48
+      kernel_constraint: null
+      kernel_initializer:
+        class_name: GlorotUniform
+        config:
+          seed: null
+      kernel_regularizer: null
+      kernel_size: !!python/tuple
+      - 1
+      name: conv1d_4
+      padding: same
+      strides: !!python/tuple
+      - 1
+      trainable: true
+      use_bias: true
+    inbound_nodes:
+    - - - tcn_spatial_dropout1d_16_s0_0.000000
+        - 0
+        - 0
+        - {}
+    name: conv1d_4
+  - class_name: Add
+    config:
+      dtype: float32
+      name: add_4
+      trainable: true
+    inbound_nodes:
+    - - - add_3
+        - 0
+        - 0
+        - &id005 {}
+      - - conv1d_4
+        - 0
+        - 0
+        - *id005
+    name: add_4
+  - class_name: Conv1D
+    config:
+      activation: linear
+      activity_regularizer: null
+      bias_constraint: null
+      bias_initializer:
+        class_name: Zeros
+        config: {}
+      bias_regularizer: null
+      data_format: channels_last
+      dilation_rate: !!python/tuple
+      - 1
+      dtype: float32
+      filters: 48
+      kernel_constraint: null
+      kernel_initializer:
+        class_name: GlorotUniform
+        config:
+          seed: null
+      kernel_regularizer: null
+      kernel_size: !!python/tuple
+      - 32
+      name: tcn_dilated_conv_1_tanh_s1
+      padding: same
+      strides: !!python/tuple
+      - 1
+      trainable: true
+      use_bias: true
+    inbound_nodes:
+    - - - add_4
+        - 0
+        - 0
+        - {}
+    name: tcn_dilated_conv_1_tanh_s1
+  - class_name: Activation
+    config:
+      activation: relu
+      dtype: float32
+      name: activation_5
+      trainable: true
+    inbound_nodes:
+    - - - tcn_dilated_conv_1_tanh_s1
+        - 0
+        - 0
+        - {}
+    name: activation_5
+  - class_name: Lambda
+    config:
+      arguments: !!python/object/apply:builtins.dict
+      - {}
+      dtype: float32
+      function: !!python/tuple
+      - '4wEAAAAAAAAAAwAAAAUAAABDAAAAcyYAAAB0AGoBdACgAnwAoQFkAWQCZAONA2QEFwB9AXwAfAEb
+
+        AH0CfAJTACkF+vMgTm9ybWFsaXplIGEgbGF5ZXIgdG8gdGhlIG1heGltdW0gYWN0aXZhdGlvbgoK
+
+        ICAgIFRoaXMga2VlcHMgYSBsYXllcnMgdmFsdWVzIGJldHdlZW4gemVybyBhbmQgb25lLgogICAg
+
+        SXQgaGVscHMgd2l0aCByZWx1J3MgdW5ib3VuZGVkIGFjdGl2YXRpb24KCiAgICBBcmdzOgogICAg
+
+        ICAgIHg6IFRoZSBsYXllciB0byBub3JtYWxpemUKCiAgICBSZXR1cm5zOgogICAgICAgIEEgbWF4
+
+        aW1hbCBub3JtYWxpemVkIGxheWVyCiAgICDpAgAAAFQpAdoIa2VlcGRpbXNn8WjjiLX45D4pA9oB
+
+        S9oDbWF42gNhYnMpA9oBeFoKbWF4X3ZhbHVlc9oDb3V0qQByCQAAAPoqL3NjcmF0Y2gyL2NsZW1l
+
+        bnMxMC9kc3Mvc3JjL2Rzcy90Y24vdGNuLnB52hVjaGFubmVsX25vcm1hbGl6YXRpb24OAAAAcwYA
+
+        AAAADRoBCAE=
+
+        '
+      - null
+      - null
+      function_type: lambda
+      module: dss.tcn.tcn
+      name: lambda_5
+      output_shape: null
+      output_shape_module: null
+      output_shape_type: raw
+      trainable: true
+    inbound_nodes:
+    - - - activation_5
+        - 0
+        - 0
+        - {}
+    name: lambda_5
+  - class_name: SpatialDropout1D
+    config:
+      dtype: float32
+      name: tcn_spatial_dropout1d_1_s1_0.000000
+      noise_shape: null
+      rate: 0.0
+      seed: null
+      trainable: true
+    inbound_nodes:
+    - - - lambda_5
+        - 0
+        - 0
+        - {}
+    name: tcn_spatial_dropout1d_1_s1_0.000000
+  - class_name: Conv1D
+    config:
+      activation: linear
+      activity_regularizer: null
+      bias_constraint: null
+      bias_initializer:
+        class_name: Zeros
+        config: {}
+      bias_regularizer: null
+      data_format: channels_last
+      dilation_rate: !!python/tuple
+      - 1
+      dtype: float32
+      filters: 48
+      kernel_constraint: null
+      kernel_initializer:
+        class_name: GlorotUniform
+        config:
+          seed: null
+      kernel_regularizer: null
+      kernel_size: !!python/tuple
+      - 1
+      name: conv1d_5
+      padding: same
+      strides: !!python/tuple
+      - 1
+      trainable: true
+      use_bias: true
+    inbound_nodes:
+    - - - tcn_spatial_dropout1d_1_s1_0.000000
+        - 0
+        - 0
+        - {}
+    name: conv1d_5
+  - class_name: Add
+    config:
+      dtype: float32
+      name: add_5
+      trainable: true
+    inbound_nodes:
+    - - - add_4
+        - 0
+        - 0
+        - &id006 {}
+      - - conv1d_5
+        - 0
+        - 0
+        - *id006
+    name: add_5
+  - class_name: Conv1D
+    config:
+      activation: linear
+      activity_regularizer: null
+      bias_constraint: null
+      bias_initializer:
+        class_name: Zeros
+        config: {}
+      bias_regularizer: null
+      data_format: channels_last
+      dilation_rate: !!python/tuple
+      - 2
+      dtype: float32
+      filters: 48
+      kernel_constraint: null
+      kernel_initializer:
+        class_name: GlorotUniform
+        config:
+          seed: null
+      kernel_regularizer: null
+      kernel_size: !!python/tuple
+      - 32
+      name: tcn_dilated_conv_2_tanh_s1
+      padding: same
+      strides: !!python/tuple
+      - 1
+      trainable: true
+      use_bias: true
+    inbound_nodes:
+    - - - add_5
+        - 0
+        - 0
+        - {}
+    name: tcn_dilated_conv_2_tanh_s1
+  - class_name: Activation
+    config:
+      activation: relu
+      dtype: float32
+      name: activation_6
+      trainable: true
+    inbound_nodes:
+    - - - tcn_dilated_conv_2_tanh_s1
+        - 0
+        - 0
+        - {}
+    name: activation_6
+  - class_name: Lambda
+    config:
+      arguments: !!python/object/apply:builtins.dict
+      - {}
+      dtype: float32
+      function: !!python/tuple
+      - '4wEAAAAAAAAAAwAAAAUAAABDAAAAcyYAAAB0AGoBdACgAnwAoQFkAWQCZAONA2QEFwB9AXwAfAEb
+
+        AH0CfAJTACkF+vMgTm9ybWFsaXplIGEgbGF5ZXIgdG8gdGhlIG1heGltdW0gYWN0aXZhdGlvbgoK
+
+        ICAgIFRoaXMga2VlcHMgYSBsYXllcnMgdmFsdWVzIGJldHdlZW4gemVybyBhbmQgb25lLgogICAg
+
+        SXQgaGVscHMgd2l0aCByZWx1J3MgdW5ib3VuZGVkIGFjdGl2YXRpb24KCiAgICBBcmdzOgogICAg
+
+        ICAgIHg6IFRoZSBsYXllciB0byBub3JtYWxpemUKCiAgICBSZXR1cm5zOgogICAgICAgIEEgbWF4
+
+        aW1hbCBub3JtYWxpemVkIGxheWVyCiAgICDpAgAAAFQpAdoIa2VlcGRpbXNn8WjjiLX45D4pA9oB
+
+        S9oDbWF42gNhYnMpA9oBeFoKbWF4X3ZhbHVlc9oDb3V0qQByCQAAAPoqL3NjcmF0Y2gyL2NsZW1l
+
+        bnMxMC9kc3Mvc3JjL2Rzcy90Y24vdGNuLnB52hVjaGFubmVsX25vcm1hbGl6YXRpb24OAAAAcwYA
+
+        AAAADRoBCAE=
+
+        '
+      - null
+      - null
+      function_type: lambda
+      module: dss.tcn.tcn
+      name: lambda_6
+      output_shape: null
+      output_shape_module: null
+      output_shape_type: raw
+      trainable: true
+    inbound_nodes:
+    - - - activation_6
+        - 0
+        - 0
+        - {}
+    name: lambda_6
+  - class_name: SpatialDropout1D
+    config:
+      dtype: float32
+      name: tcn_spatial_dropout1d_2_s1_0.000000
+      noise_shape: null
+      rate: 0.0
+      seed: null
+      trainable: true
+    inbound_nodes:
+    - - - lambda_6
+        - 0
+        - 0
+        - {}
+    name: tcn_spatial_dropout1d_2_s1_0.000000
+  - class_name: Conv1D
+    config:
+      activation: linear
+      activity_regularizer: null
+      bias_constraint: null
+      bias_initializer:
+        class_name: Zeros
+        config: {}
+      bias_regularizer: null
+      data_format: channels_last
+      dilation_rate: !!python/tuple
+      - 1
+      dtype: float32
+      filters: 48
+      kernel_constraint: null
+      kernel_initializer:
+        class_name: GlorotUniform
+        config:
+          seed: null
+      kernel_regularizer: null
+      kernel_size: !!python/tuple
+      - 1
+      name: conv1d_6
+      padding: same
+      strides: !!python/tuple
+      - 1
+      trainable: true
+      use_bias: true
+    inbound_nodes:
+    - - - tcn_spatial_dropout1d_2_s1_0.000000
+        - 0
+        - 0
+        - {}
+    name: conv1d_6
+  - class_name: Add
+    config:
+      dtype: float32
+      name: add_6
+      trainable: true
+    inbound_nodes:
+    - - - add_5
+        - 0
+        - 0
+        - &id007 {}
+      - - conv1d_6
+        - 0
+        - 0
+        - *id007
+    name: add_6
+  - class_name: Conv1D
+    config:
+      activation: linear
+      activity_regularizer: null
+      bias_constraint: null
+      bias_initializer:
+        class_name: Zeros
+        config: {}
+      bias_regularizer: null
+      data_format: channels_last
+      dilation_rate: !!python/tuple
+      - 4
+      dtype: float32
+      filters: 48
+      kernel_constraint: null
+      kernel_initializer:
+        class_name: GlorotUniform
+        config:
+          seed: null
+      kernel_regularizer: null
+      kernel_size: !!python/tuple
+      - 32
+      name: tcn_dilated_conv_4_tanh_s1
+      padding: same
+      strides: !!python/tuple
+      - 1
+      trainable: true
+      use_bias: true
+    inbound_nodes:
+    - - - add_6
+        - 0
+        - 0
+        - {}
+    name: tcn_dilated_conv_4_tanh_s1
+  - class_name: Activation
+    config:
+      activation: relu
+      dtype: float32
+      name: activation_7
+      trainable: true
+    inbound_nodes:
+    - - - tcn_dilated_conv_4_tanh_s1
+        - 0
+        - 0
+        - {}
+    name: activation_7
+  - class_name: Lambda
+    config:
+      arguments: !!python/object/apply:builtins.dict
+      - {}
+      dtype: float32
+      function: !!python/tuple
+      - '4wEAAAAAAAAAAwAAAAUAAABDAAAAcyYAAAB0AGoBdACgAnwAoQFkAWQCZAONA2QEFwB9AXwAfAEb
+
+        AH0CfAJTACkF+vMgTm9ybWFsaXplIGEgbGF5ZXIgdG8gdGhlIG1heGltdW0gYWN0aXZhdGlvbgoK
+
+        ICAgIFRoaXMga2VlcHMgYSBsYXllcnMgdmFsdWVzIGJldHdlZW4gemVybyBhbmQgb25lLgogICAg
+
+        SXQgaGVscHMgd2l0aCByZWx1J3MgdW5ib3VuZGVkIGFjdGl2YXRpb24KCiAgICBBcmdzOgogICAg
+
+        ICAgIHg6IFRoZSBsYXllciB0byBub3JtYWxpemUKCiAgICBSZXR1cm5zOgogICAgICAgIEEgbWF4
+
+        aW1hbCBub3JtYWxpemVkIGxheWVyCiAgICDpAgAAAFQpAdoIa2VlcGRpbXNn8WjjiLX45D4pA9oB
+
+        S9oDbWF42gNhYnMpA9oBeFoKbWF4X3ZhbHVlc9oDb3V0qQByCQAAAPoqL3NjcmF0Y2gyL2NsZW1l
+
+        bnMxMC9kc3Mvc3JjL2Rzcy90Y24vdGNuLnB52hVjaGFubmVsX25vcm1hbGl6YXRpb24OAAAAcwYA
+
+        AAAADRoBCAE=
+
+        '
+      - null
+      - null
+      function_type: lambda
+      module: dss.tcn.tcn
+      name: lambda_7
+      output_shape: null
+      output_shape_module: null
+      output_shape_type: raw
+      trainable: true
+    inbound_nodes:
+    - - - activation_7
+        - 0
+        - 0
+        - {}
+    name: lambda_7
+  - class_name: SpatialDropout1D
+    config:
+      dtype: float32
+      name: tcn_spatial_dropout1d_4_s1_0.000000
+      noise_shape: null
+      rate: 0.0
+      seed: null
+      trainable: true
+    inbound_nodes:
+    - - - lambda_7
+        - 0
+        - 0
+        - {}
+    name: tcn_spatial_dropout1d_4_s1_0.000000
+  - class_name: Conv1D
+    config:
+      activation: linear
+      activity_regularizer: null
+      bias_constraint: null
+      bias_initializer:
+        class_name: Zeros
+        config: {}
+      bias_regularizer: null
+      data_format: channels_last
+      dilation_rate: !!python/tuple
+      - 1
+      dtype: float32
+      filters: 48
+      kernel_constraint: null
+      kernel_initializer:
+        class_name: GlorotUniform
+        config:
+          seed: null
+      kernel_regularizer: null
+      kernel_size: !!python/tuple
+      - 1
+      name: conv1d_7
+      padding: same
+      strides: !!python/tuple
+      - 1
+      trainable: true
+      use_bias: true
+    inbound_nodes:
+    - - - tcn_spatial_dropout1d_4_s1_0.000000
+        - 0
+        - 0
+        - {}
+    name: conv1d_7
+  - class_name: Add
+    config:
+      dtype: float32
+      name: add_7
+      trainable: true
+    inbound_nodes:
+    - - - add_6
+        - 0
+        - 0
+        - &id008 {}
+      - - conv1d_7
+        - 0
+        - 0
+        - *id008
+    name: add_7
+  - class_name: Conv1D
+    config:
+      activation: linear
+      activity_regularizer: null
+      bias_constraint: null
+      bias_initializer:
+        class_name: Zeros
+        config: {}
+      bias_regularizer: null
+      data_format: channels_last
+      dilation_rate: !!python/tuple
+      - 8
+      dtype: float32
+      filters: 48
+      kernel_constraint: null
+      kernel_initializer:
+        class_name: GlorotUniform
+        config:
+          seed: null
+      kernel_regularizer: null
+      kernel_size: !!python/tuple
+      - 32
+      name: tcn_dilated_conv_8_tanh_s1
+      padding: same
+      strides: !!python/tuple
+      - 1
+      trainable: true
+      use_bias: true
+    inbound_nodes:
+    - - - add_7
+        - 0
+        - 0
+        - {}
+    name: tcn_dilated_conv_8_tanh_s1
+  - class_name: Activation
+    config:
+      activation: relu
+      dtype: float32
+      name: activation_8
+      trainable: true
+    inbound_nodes:
+    - - - tcn_dilated_conv_8_tanh_s1
+        - 0
+        - 0
+        - {}
+    name: activation_8
+  - class_name: Lambda
+    config:
+      arguments: !!python/object/apply:builtins.dict
+      - {}
+      dtype: float32
+      function: !!python/tuple
+      - '4wEAAAAAAAAAAwAAAAUAAABDAAAAcyYAAAB0AGoBdACgAnwAoQFkAWQCZAONA2QEFwB9AXwAfAEb
+
+        AH0CfAJTACkF+vMgTm9ybWFsaXplIGEgbGF5ZXIgdG8gdGhlIG1heGltdW0gYWN0aXZhdGlvbgoK
+
+        ICAgIFRoaXMga2VlcHMgYSBsYXllcnMgdmFsdWVzIGJldHdlZW4gemVybyBhbmQgb25lLgogICAg
+
+        SXQgaGVscHMgd2l0aCByZWx1J3MgdW5ib3VuZGVkIGFjdGl2YXRpb24KCiAgICBBcmdzOgogICAg
+
+        ICAgIHg6IFRoZSBsYXllciB0byBub3JtYWxpemUKCiAgICBSZXR1cm5zOgogICAgICAgIEEgbWF4
+
+        aW1hbCBub3JtYWxpemVkIGxheWVyCiAgICDpAgAAAFQpAdoIa2VlcGRpbXNn8WjjiLX45D4pA9oB
+
+        S9oDbWF42gNhYnMpA9oBeFoKbWF4X3ZhbHVlc9oDb3V0qQByCQAAAPoqL3NjcmF0Y2gyL2NsZW1l
+
+        bnMxMC9kc3Mvc3JjL2Rzcy90Y24vdGNuLnB52hVjaGFubmVsX25vcm1hbGl6YXRpb24OAAAAcwYA
+
+        AAAADRoBCAE=
+
+        '
+      - null
+      - null
+      function_type: lambda
+      module: dss.tcn.tcn
+      name: lambda_8
+      output_shape: null
+      output_shape_module: null
+      output_shape_type: raw
+      trainable: true
+    inbound_nodes:
+    - - - activation_8
+        - 0
+        - 0
+        - {}
+    name: lambda_8
+  - class_name: SpatialDropout1D
+    config:
+      dtype: float32
+      name: tcn_spatial_dropout1d_8_s1_0.000000
+      noise_shape: null
+      rate: 0.0
+      seed: null
+      trainable: true
+    inbound_nodes:
+    - - - lambda_8
+        - 0
+        - 0
+        - {}
+    name: tcn_spatial_dropout1d_8_s1_0.000000
+  - class_name: Conv1D
+    config:
+      activation: linear
+      activity_regularizer: null
+      bias_constraint: null
+      bias_initializer:
+        class_name: Zeros
+        config: {}
+      bias_regularizer: null
+      data_format: channels_last
+      dilation_rate: !!python/tuple
+      - 1
+      dtype: float32
+      filters: 48
+      kernel_constraint: null
+      kernel_initializer:
+        class_name: GlorotUniform
+        config:
+          seed: null
+      kernel_regularizer: null
+      kernel_size: !!python/tuple
+      - 1
+      name: conv1d_8
+      padding: same
+      strides: !!python/tuple
+      - 1
+      trainable: true
+      use_bias: true
+    inbound_nodes:
+    - - - tcn_spatial_dropout1d_8_s1_0.000000
+        - 0
+        - 0
+        - {}
+    name: conv1d_8
+  - class_name: Add
+    config:
+      dtype: float32
+      name: add_8
+      trainable: true
+    inbound_nodes:
+    - - - add_7
+        - 0
+        - 0
+        - &id009 {}
+      - - conv1d_8
+        - 0
+        - 0
+        - *id009
+    name: add_8
+  - class_name: Conv1D
+    config:
+      activation: linear
+      activity_regularizer: null
+      bias_constraint: null
+      bias_initializer:
+        class_name: Zeros
+        config: {}
+      bias_regularizer: null
+      data_format: channels_last
+      dilation_rate: !!python/tuple
+      - 16
+      dtype: float32
+      filters: 48
+      kernel_constraint: null
+      kernel_initializer:
+        class_name: GlorotUniform
+        config:
+          seed: null
+      kernel_regularizer: null
+      kernel_size: !!python/tuple
+      - 32
+      name: tcn_dilated_conv_16_tanh_s1
+      padding: same
+      strides: !!python/tuple
+      - 1
+      trainable: true
+      use_bias: true
+    inbound_nodes:
+    - - - add_8
+        - 0
+        - 0
+        - {}
+    name: tcn_dilated_conv_16_tanh_s1
+  - class_name: Activation
+    config:
+      activation: relu
+      dtype: float32
+      name: activation_9
+      trainable: true
+    inbound_nodes:
+    - - - tcn_dilated_conv_16_tanh_s1
+        - 0
+        - 0
+        - {}
+    name: activation_9
+  - class_name: Lambda
+    config:
+      arguments: !!python/object/apply:builtins.dict
+      - {}
+      dtype: float32
+      function: !!python/tuple
+      - '4wEAAAAAAAAAAwAAAAUAAABDAAAAcyYAAAB0AGoBdACgAnwAoQFkAWQCZAONA2QEFwB9AXwAfAEb
+
+        AH0CfAJTACkF+vMgTm9ybWFsaXplIGEgbGF5ZXIgdG8gdGhlIG1heGltdW0gYWN0aXZhdGlvbgoK
+
+        ICAgIFRoaXMga2VlcHMgYSBsYXllcnMgdmFsdWVzIGJldHdlZW4gemVybyBhbmQgb25lLgogICAg
+
+        SXQgaGVscHMgd2l0aCByZWx1J3MgdW5ib3VuZGVkIGFjdGl2YXRpb24KCiAgICBBcmdzOgogICAg
+
+        ICAgIHg6IFRoZSBsYXllciB0byBub3JtYWxpemUKCiAgICBSZXR1cm5zOgogICAgICAgIEEgbWF4
+
+        aW1hbCBub3JtYWxpemVkIGxheWVyCiAgICDpAgAAAFQpAdoIa2VlcGRpbXNn8WjjiLX45D4pA9oB
+
+        S9oDbWF42gNhYnMpA9oBeFoKbWF4X3ZhbHVlc9oDb3V0qQByCQAAAPoqL3NjcmF0Y2gyL2NsZW1l
+
+        bnMxMC9kc3Mvc3JjL2Rzcy90Y24vdGNuLnB52hVjaGFubmVsX25vcm1hbGl6YXRpb24OAAAAcwYA
+
+        AAAADRoBCAE=
+
+        '
+      - null
+      - null
+      function_type: lambda
+      module: dss.tcn.tcn
+      name: lambda_9
+      output_shape: null
+      output_shape_module: null
+      output_shape_type: raw
+      trainable: true
+    inbound_nodes:
+    - - - activation_9
+        - 0
+        - 0
+        - {}
+    name: lambda_9
+  - class_name: SpatialDropout1D
+    config:
+      dtype: float32
+      name: tcn_spatial_dropout1d_16_s1_0.000000
+      noise_shape: null
+      rate: 0.0
+      seed: null
+      trainable: true
+    inbound_nodes:
+    - - - lambda_9
+        - 0
+        - 0
+        - {}
+    name: tcn_spatial_dropout1d_16_s1_0.000000
+  - class_name: Conv1D
+    config:
+      activation: linear
+      activity_regularizer: null
+      bias_constraint: null
+      bias_initializer:
+        class_name: Zeros
+        config: {}
+      bias_regularizer: null
+      data_format: channels_last
+      dilation_rate: !!python/tuple
+      - 1
+      dtype: float32
+      filters: 48
+      kernel_constraint: null
+      kernel_initializer:
+        class_name: GlorotUniform
+        config:
+          seed: null
+      kernel_regularizer: null
+      kernel_size: !!python/tuple
+      - 1
+      name: conv1d_9
+      padding: same
+      strides: !!python/tuple
+      - 1
+      trainable: true
+      use_bias: true
+    inbound_nodes:
+    - - - tcn_spatial_dropout1d_16_s1_0.000000
+        - 0
+        - 0
+        - {}
+    name: conv1d_9
+  - class_name: Add
+    config:
+      dtype: float32
+      name: add_9
+      trainable: true
+    inbound_nodes:
+    - - - add_8
+        - 0
+        - 0
+        - &id010 {}
+      - - conv1d_9
+        - 0
+        - 0
+        - *id010
+    name: add_9
+  - class_name: Conv1D
+    config:
+      activation: linear
+      activity_regularizer: null
+      bias_constraint: null
+      bias_initializer:
+        class_name: Zeros
+        config: {}
+      bias_regularizer: null
+      data_format: channels_last
+      dilation_rate: !!python/tuple
+      - 1
+      dtype: float32
+      filters: 48
+      kernel_constraint: null
+      kernel_initializer:
+        class_name: GlorotUniform
+        config:
+          seed: null
+      kernel_regularizer: null
+      kernel_size: !!python/tuple
+      - 32
+      name: tcn_dilated_conv_1_tanh_s2
+      padding: same
+      strides: !!python/tuple
+      - 1
+      trainable: true
+      use_bias: true
+    inbound_nodes:
+    - - - add_9
+        - 0
+        - 0
+        - {}
+    name: tcn_dilated_conv_1_tanh_s2
+  - class_name: Activation
+    config:
+      activation: relu
+      dtype: float32
+      name: activation_10
+      trainable: true
+    inbound_nodes:
+    - - - tcn_dilated_conv_1_tanh_s2
+        - 0
+        - 0
+        - {}
+    name: activation_10
+  - class_name: Lambda
+    config:
+      arguments: !!python/object/apply:builtins.dict
+      - {}
+      dtype: float32
+      function: !!python/tuple
+      - '4wEAAAAAAAAAAwAAAAUAAABDAAAAcyYAAAB0AGoBdACgAnwAoQFkAWQCZAONA2QEFwB9AXwAfAEb
+
+        AH0CfAJTACkF+vMgTm9ybWFsaXplIGEgbGF5ZXIgdG8gdGhlIG1heGltdW0gYWN0aXZhdGlvbgoK
+
+        ICAgIFRoaXMga2VlcHMgYSBsYXllcnMgdmFsdWVzIGJldHdlZW4gemVybyBhbmQgb25lLgogICAg
+
+        SXQgaGVscHMgd2l0aCByZWx1J3MgdW5ib3VuZGVkIGFjdGl2YXRpb24KCiAgICBBcmdzOgogICAg
+
+        ICAgIHg6IFRoZSBsYXllciB0byBub3JtYWxpemUKCiAgICBSZXR1cm5zOgogICAgICAgIEEgbWF4
+
+        aW1hbCBub3JtYWxpemVkIGxheWVyCiAgICDpAgAAAFQpAdoIa2VlcGRpbXNn8WjjiLX45D4pA9oB
+
+        S9oDbWF42gNhYnMpA9oBeFoKbWF4X3ZhbHVlc9oDb3V0qQByCQAAAPoqL3NjcmF0Y2gyL2NsZW1l
+
+        bnMxMC9kc3Mvc3JjL2Rzcy90Y24vdGNuLnB52hVjaGFubmVsX25vcm1hbGl6YXRpb24OAAAAcwYA
+
+        AAAADRoBCAE=
+
+        '
+      - null
+      - null
+      function_type: lambda
+      module: dss.tcn.tcn
+      name: lambda_10
+      output_shape: null
+      output_shape_module: null
+      output_shape_type: raw
+      trainable: true
+    inbound_nodes:
+    - - - activation_10
+        - 0
+        - 0
+        - {}
+    name: lambda_10
+  - class_name: SpatialDropout1D
+    config:
+      dtype: float32
+      name: tcn_spatial_dropout1d_1_s2_0.000000
+      noise_shape: null
+      rate: 0.0
+      seed: null
+      trainable: true
+    inbound_nodes:
+    - - - lambda_10
+        - 0
+        - 0
+        - {}
+    name: tcn_spatial_dropout1d_1_s2_0.000000
+  - class_name: Conv1D
+    config:
+      activation: linear
+      activity_regularizer: null
+      bias_constraint: null
+      bias_initializer:
+        class_name: Zeros
+        config: {}
+      bias_regularizer: null
+      data_format: channels_last
+      dilation_rate: !!python/tuple
+      - 1
+      dtype: float32
+      filters: 48
+      kernel_constraint: null
+      kernel_initializer:
+        class_name: GlorotUniform
+        config:
+          seed: null
+      kernel_regularizer: null
+      kernel_size: !!python/tuple
+      - 1
+      name: conv1d_10
+      padding: same
+      strides: !!python/tuple
+      - 1
+      trainable: true
+      use_bias: true
+    inbound_nodes:
+    - - - tcn_spatial_dropout1d_1_s2_0.000000
+        - 0
+        - 0
+        - {}
+    name: conv1d_10
+  - class_name: Add
+    config:
+      dtype: float32
+      name: add_10
+      trainable: true
+    inbound_nodes:
+    - - - add_9
+        - 0
+        - 0
+        - &id011 {}
+      - - conv1d_10
+        - 0
+        - 0
+        - *id011
+    name: add_10
+  - class_name: Conv1D
+    config:
+      activation: linear
+      activity_regularizer: null
+      bias_constraint: null
+      bias_initializer:
+        class_name: Zeros
+        config: {}
+      bias_regularizer: null
+      data_format: channels_last
+      dilation_rate: !!python/tuple
+      - 2
+      dtype: float32
+      filters: 48
+      kernel_constraint: null
+      kernel_initializer:
+        class_name: GlorotUniform
+        config:
+          seed: null
+      kernel_regularizer: null
+      kernel_size: !!python/tuple
+      - 32
+      name: tcn_dilated_conv_2_tanh_s2
+      padding: same
+      strides: !!python/tuple
+      - 1
+      trainable: true
+      use_bias: true
+    inbound_nodes:
+    - - - add_10
+        - 0
+        - 0
+        - {}
+    name: tcn_dilated_conv_2_tanh_s2
+  - class_name: Activation
+    config:
+      activation: relu
+      dtype: float32
+      name: activation_11
+      trainable: true
+    inbound_nodes:
+    - - - tcn_dilated_conv_2_tanh_s2
+        - 0
+        - 0
+        - {}
+    name: activation_11
+  - class_name: Lambda
+    config:
+      arguments: !!python/object/apply:builtins.dict
+      - {}
+      dtype: float32
+      function: !!python/tuple
+      - '4wEAAAAAAAAAAwAAAAUAAABDAAAAcyYAAAB0AGoBdACgAnwAoQFkAWQCZAONA2QEFwB9AXwAfAEb
+
+        AH0CfAJTACkF+vMgTm9ybWFsaXplIGEgbGF5ZXIgdG8gdGhlIG1heGltdW0gYWN0aXZhdGlvbgoK
+
+        ICAgIFRoaXMga2VlcHMgYSBsYXllcnMgdmFsdWVzIGJldHdlZW4gemVybyBhbmQgb25lLgogICAg
+
+        SXQgaGVscHMgd2l0aCByZWx1J3MgdW5ib3VuZGVkIGFjdGl2YXRpb24KCiAgICBBcmdzOgogICAg
+
+        ICAgIHg6IFRoZSBsYXllciB0byBub3JtYWxpemUKCiAgICBSZXR1cm5zOgogICAgICAgIEEgbWF4
+
+        aW1hbCBub3JtYWxpemVkIGxheWVyCiAgICDpAgAAAFQpAdoIa2VlcGRpbXNn8WjjiLX45D4pA9oB
+
+        S9oDbWF42gNhYnMpA9oBeFoKbWF4X3ZhbHVlc9oDb3V0qQByCQAAAPoqL3NjcmF0Y2gyL2NsZW1l
+
+        bnMxMC9kc3Mvc3JjL2Rzcy90Y24vdGNuLnB52hVjaGFubmVsX25vcm1hbGl6YXRpb24OAAAAcwYA
+
+        AAAADRoBCAE=
+
+        '
+      - null
+      - null
+      function_type: lambda
+      module: dss.tcn.tcn
+      name: lambda_11
+      output_shape: null
+      output_shape_module: null
+      output_shape_type: raw
+      trainable: true
+    inbound_nodes:
+    - - - activation_11
+        - 0
+        - 0
+        - {}
+    name: lambda_11
+  - class_name: SpatialDropout1D
+    config:
+      dtype: float32
+      name: tcn_spatial_dropout1d_2_s2_0.000000
+      noise_shape: null
+      rate: 0.0
+      seed: null
+      trainable: true
+    inbound_nodes:
+    - - - lambda_11
+        - 0
+        - 0
+        - {}
+    name: tcn_spatial_dropout1d_2_s2_0.000000
+  - class_name: Conv1D
+    config:
+      activation: linear
+      activity_regularizer: null
+      bias_constraint: null
+      bias_initializer:
+        class_name: Zeros
+        config: {}
+      bias_regularizer: null
+      data_format: channels_last
+      dilation_rate: !!python/tuple
+      - 1
+      dtype: float32
+      filters: 48
+      kernel_constraint: null
+      kernel_initializer:
+        class_name: GlorotUniform
+        config:
+          seed: null
+      kernel_regularizer: null
+      kernel_size: !!python/tuple
+      - 1
+      name: conv1d_11
+      padding: same
+      strides: !!python/tuple
+      - 1
+      trainable: true
+      use_bias: true
+    inbound_nodes:
+    - - - tcn_spatial_dropout1d_2_s2_0.000000
+        - 0
+        - 0
+        - {}
+    name: conv1d_11
+  - class_name: Add
+    config:
+      dtype: float32
+      name: add_11
+      trainable: true
+    inbound_nodes:
+    - - - add_10
+        - 0
+        - 0
+        - &id012 {}
+      - - conv1d_11
+        - 0
+        - 0
+        - *id012
+    name: add_11
+  - class_name: Conv1D
+    config:
+      activation: linear
+      activity_regularizer: null
+      bias_constraint: null
+      bias_initializer:
+        class_name: Zeros
+        config: {}
+      bias_regularizer: null
+      data_format: channels_last
+      dilation_rate: !!python/tuple
+      - 4
+      dtype: float32
+      filters: 48
+      kernel_constraint: null
+      kernel_initializer:
+        class_name: GlorotUniform
+        config:
+          seed: null
+      kernel_regularizer: null
+      kernel_size: !!python/tuple
+      - 32
+      name: tcn_dilated_conv_4_tanh_s2
+      padding: same
+      strides: !!python/tuple
+      - 1
+      trainable: true
+      use_bias: true
+    inbound_nodes:
+    - - - add_11
+        - 0
+        - 0
+        - {}
+    name: tcn_dilated_conv_4_tanh_s2
+  - class_name: Activation
+    config:
+      activation: relu
+      dtype: float32
+      name: activation_12
+      trainable: true
+    inbound_nodes:
+    - - - tcn_dilated_conv_4_tanh_s2
+        - 0
+        - 0
+        - {}
+    name: activation_12
+  - class_name: Lambda
+    config:
+      arguments: !!python/object/apply:builtins.dict
+      - {}
+      dtype: float32
+      function: !!python/tuple
+      - '4wEAAAAAAAAAAwAAAAUAAABDAAAAcyYAAAB0AGoBdACgAnwAoQFkAWQCZAONA2QEFwB9AXwAfAEb
+
+        AH0CfAJTACkF+vMgTm9ybWFsaXplIGEgbGF5ZXIgdG8gdGhlIG1heGltdW0gYWN0aXZhdGlvbgoK
+
+        ICAgIFRoaXMga2VlcHMgYSBsYXllcnMgdmFsdWVzIGJldHdlZW4gemVybyBhbmQgb25lLgogICAg
+
+        SXQgaGVscHMgd2l0aCByZWx1J3MgdW5ib3VuZGVkIGFjdGl2YXRpb24KCiAgICBBcmdzOgogICAg
+
+        ICAgIHg6IFRoZSBsYXllciB0byBub3JtYWxpemUKCiAgICBSZXR1cm5zOgogICAgICAgIEEgbWF4
+
+        aW1hbCBub3JtYWxpemVkIGxheWVyCiAgICDpAgAAAFQpAdoIa2VlcGRpbXNn8WjjiLX45D4pA9oB
+
+        S9oDbWF42gNhYnMpA9oBeFoKbWF4X3ZhbHVlc9oDb3V0qQByCQAAAPoqL3NjcmF0Y2gyL2NsZW1l
+
+        bnMxMC9kc3Mvc3JjL2Rzcy90Y24vdGNuLnB52hVjaGFubmVsX25vcm1hbGl6YXRpb24OAAAAcwYA
+
+        AAAADRoBCAE=
+
+        '
+      - null
+      - null
+      function_type: lambda
+      module: dss.tcn.tcn
+      name: lambda_12
+      output_shape: null
+      output_shape_module: null
+      output_shape_type: raw
+      trainable: true
+    inbound_nodes:
+    - - - activation_12
+        - 0
+        - 0
+        - {}
+    name: lambda_12
+  - class_name: SpatialDropout1D
+    config:
+      dtype: float32
+      name: tcn_spatial_dropout1d_4_s2_0.000000
+      noise_shape: null
+      rate: 0.0
+      seed: null
+      trainable: true
+    inbound_nodes:
+    - - - lambda_12
+        - 0
+        - 0
+        - {}
+    name: tcn_spatial_dropout1d_4_s2_0.000000
+  - class_name: Conv1D
+    config:
+      activation: linear
+      activity_regularizer: null
+      bias_constraint: null
+      bias_initializer:
+        class_name: Zeros
+        config: {}
+      bias_regularizer: null
+      data_format: channels_last
+      dilation_rate: !!python/tuple
+      - 1
+      dtype: float32
+      filters: 48
+      kernel_constraint: null
+      kernel_initializer:
+        class_name: GlorotUniform
+        config:
+          seed: null
+      kernel_regularizer: null
+      kernel_size: !!python/tuple
+      - 1
+      name: conv1d_12
+      padding: same
+      strides: !!python/tuple
+      - 1
+      trainable: true
+      use_bias: true
+    inbound_nodes:
+    - - - tcn_spatial_dropout1d_4_s2_0.000000
+        - 0
+        - 0
+        - {}
+    name: conv1d_12
+  - class_name: Add
+    config:
+      dtype: float32
+      name: add_12
+      trainable: true
+    inbound_nodes:
+    - - - add_11
+        - 0
+        - 0
+        - &id013 {}
+      - - conv1d_12
+        - 0
+        - 0
+        - *id013
+    name: add_12
+  - class_name: Conv1D
+    config:
+      activation: linear
+      activity_regularizer: null
+      bias_constraint: null
+      bias_initializer:
+        class_name: Zeros
+        config: {}
+      bias_regularizer: null
+      data_format: channels_last
+      dilation_rate: !!python/tuple
+      - 8
+      dtype: float32
+      filters: 48
+      kernel_constraint: null
+      kernel_initializer:
+        class_name: GlorotUniform
+        config:
+          seed: null
+      kernel_regularizer: null
+      kernel_size: !!python/tuple
+      - 32
+      name: tcn_dilated_conv_8_tanh_s2
+      padding: same
+      strides: !!python/tuple
+      - 1
+      trainable: true
+      use_bias: true
+    inbound_nodes:
+    - - - add_12
+        - 0
+        - 0
+        - {}
+    name: tcn_dilated_conv_8_tanh_s2
+  - class_name: Activation
+    config:
+      activation: relu
+      dtype: float32
+      name: activation_13
+      trainable: true
+    inbound_nodes:
+    - - - tcn_dilated_conv_8_tanh_s2
+        - 0
+        - 0
+        - {}
+    name: activation_13
+  - class_name: Lambda
+    config:
+      arguments: !!python/object/apply:builtins.dict
+      - {}
+      dtype: float32
+      function: !!python/tuple
+      - '4wEAAAAAAAAAAwAAAAUAAABDAAAAcyYAAAB0AGoBdACgAnwAoQFkAWQCZAONA2QEFwB9AXwAfAEb
+
+        AH0CfAJTACkF+vMgTm9ybWFsaXplIGEgbGF5ZXIgdG8gdGhlIG1heGltdW0gYWN0aXZhdGlvbgoK
+
+        ICAgIFRoaXMga2VlcHMgYSBsYXllcnMgdmFsdWVzIGJldHdlZW4gemVybyBhbmQgb25lLgogICAg
+
+        SXQgaGVscHMgd2l0aCByZWx1J3MgdW5ib3VuZGVkIGFjdGl2YXRpb24KCiAgICBBcmdzOgogICAg
+
+        ICAgIHg6IFRoZSBsYXllciB0byBub3JtYWxpemUKCiAgICBSZXR1cm5zOgogICAgICAgIEEgbWF4
+
+        aW1hbCBub3JtYWxpemVkIGxheWVyCiAgICDpAgAAAFQpAdoIa2VlcGRpbXNn8WjjiLX45D4pA9oB
+
+        S9oDbWF42gNhYnMpA9oBeFoKbWF4X3ZhbHVlc9oDb3V0qQByCQAAAPoqL3NjcmF0Y2gyL2NsZW1l
+
+        bnMxMC9kc3Mvc3JjL2Rzcy90Y24vdGNuLnB52hVjaGFubmVsX25vcm1hbGl6YXRpb24OAAAAcwYA
+
+        AAAADRoBCAE=
+
+        '
+      - null
+      - null
+      function_type: lambda
+      module: dss.tcn.tcn
+      name: lambda_13
+      output_shape: null
+      output_shape_module: null
+      output_shape_type: raw
+      trainable: true
+    inbound_nodes:
+    - - - activation_13
+        - 0
+        - 0
+        - {}
+    name: lambda_13
+  - class_name: SpatialDropout1D
+    config:
+      dtype: float32
+      name: tcn_spatial_dropout1d_8_s2_0.000000
+      noise_shape: null
+      rate: 0.0
+      seed: null
+      trainable: true
+    inbound_nodes:
+    - - - lambda_13
+        - 0
+        - 0
+        - {}
+    name: tcn_spatial_dropout1d_8_s2_0.000000
+  - class_name: Conv1D
+    config:
+      activation: linear
+      activity_regularizer: null
+      bias_constraint: null
+      bias_initializer:
+        class_name: Zeros
+        config: {}
+      bias_regularizer: null
+      data_format: channels_last
+      dilation_rate: !!python/tuple
+      - 1
+      dtype: float32
+      filters: 48
+      kernel_constraint: null
+      kernel_initializer:
+        class_name: GlorotUniform
+        config:
+          seed: null
+      kernel_regularizer: null
+      kernel_size: !!python/tuple
+      - 1
+      name: conv1d_13
+      padding: same
+      strides: !!python/tuple
+      - 1
+      trainable: true
+      use_bias: true
+    inbound_nodes:
+    - - - tcn_spatial_dropout1d_8_s2_0.000000
+        - 0
+        - 0
+        - {}
+    name: conv1d_13
+  - class_name: Add
+    config:
+      dtype: float32
+      name: add_13
+      trainable: true
+    inbound_nodes:
+    - - - add_12
+        - 0
+        - 0
+        - &id014 {}
+      - - conv1d_13
+        - 0
+        - 0
+        - *id014
+    name: add_13
+  - class_name: Conv1D
+    config:
+      activation: linear
+      activity_regularizer: null
+      bias_constraint: null
+      bias_initializer:
+        class_name: Zeros
+        config: {}
+      bias_regularizer: null
+      data_format: channels_last
+      dilation_rate: !!python/tuple
+      - 16
+      dtype: float32
+      filters: 48
+      kernel_constraint: null
+      kernel_initializer:
+        class_name: GlorotUniform
+        config:
+          seed: null
+      kernel_regularizer: null
+      kernel_size: !!python/tuple
+      - 32
+      name: tcn_dilated_conv_16_tanh_s2
+      padding: same
+      strides: !!python/tuple
+      - 1
+      trainable: true
+      use_bias: true
+    inbound_nodes:
+    - - - add_13
+        - 0
+        - 0
+        - {}
+    name: tcn_dilated_conv_16_tanh_s2
+  - class_name: Activation
+    config:
+      activation: relu
+      dtype: float32
+      name: activation_14
+      trainable: true
+    inbound_nodes:
+    - - - tcn_dilated_conv_16_tanh_s2
+        - 0
+        - 0
+        - {}
+    name: activation_14
+  - class_name: Lambda
+    config:
+      arguments: !!python/object/apply:builtins.dict
+      - {}
+      dtype: float32
+      function: !!python/tuple
+      - '4wEAAAAAAAAAAwAAAAUAAABDAAAAcyYAAAB0AGoBdACgAnwAoQFkAWQCZAONA2QEFwB9AXwAfAEb
+
+        AH0CfAJTACkF+vMgTm9ybWFsaXplIGEgbGF5ZXIgdG8gdGhlIG1heGltdW0gYWN0aXZhdGlvbgoK
+
+        ICAgIFRoaXMga2VlcHMgYSBsYXllcnMgdmFsdWVzIGJldHdlZW4gemVybyBhbmQgb25lLgogICAg
+
+        SXQgaGVscHMgd2l0aCByZWx1J3MgdW5ib3VuZGVkIGFjdGl2YXRpb24KCiAgICBBcmdzOgogICAg
+
+        ICAgIHg6IFRoZSBsYXllciB0byBub3JtYWxpemUKCiAgICBSZXR1cm5zOgogICAgICAgIEEgbWF4
+
+        aW1hbCBub3JtYWxpemVkIGxheWVyCiAgICDpAgAAAFQpAdoIa2VlcGRpbXNn8WjjiLX45D4pA9oB
+
+        S9oDbWF42gNhYnMpA9oBeFoKbWF4X3ZhbHVlc9oDb3V0qQByCQAAAPoqL3NjcmF0Y2gyL2NsZW1l
+
+        bnMxMC9kc3Mvc3JjL2Rzcy90Y24vdGNuLnB52hVjaGFubmVsX25vcm1hbGl6YXRpb24OAAAAcwYA
+
+        AAAADRoBCAE=
+
+        '
+      - null
+      - null
+      function_type: lambda
+      module: dss.tcn.tcn
+      name: lambda_14
+      output_shape: null
+      output_shape_module: null
+      output_shape_type: raw
+      trainable: true
+    inbound_nodes:
+    - - - activation_14
+        - 0
+        - 0
+        - {}
+    name: lambda_14
+  - class_name: SpatialDropout1D
+    config:
+      dtype: float32
+      name: tcn_spatial_dropout1d_16_s2_0.000000
+      noise_shape: null
+      rate: 0.0
+      seed: null
+      trainable: true
+    inbound_nodes:
+    - - - lambda_14
+        - 0
+        - 0
+        - {}
+    name: tcn_spatial_dropout1d_16_s2_0.000000
+  - class_name: Conv1D
+    config:
+      activation: linear
+      activity_regularizer: null
+      bias_constraint: null
+      bias_initializer:
+        class_name: Zeros
+        config: {}
+      bias_regularizer: null
+      data_format: channels_last
+      dilation_rate: !!python/tuple
+      - 1
+      dtype: float32
+      filters: 48
+      kernel_constraint: null
+      kernel_initializer:
+        class_name: GlorotUniform
+        config:
+          seed: null
+      kernel_regularizer: null
+      kernel_size: !!python/tuple
+      - 1
+      name: conv1d_14
+      padding: same
+      strides: !!python/tuple
+      - 1
+      trainable: true
+      use_bias: true
+    inbound_nodes:
+    - - - tcn_spatial_dropout1d_16_s2_0.000000
+        - 0
+        - 0
+        - {}
+    name: conv1d_14
+  - class_name: Add
+    config:
+      dtype: float32
+      name: add_14
+      trainable: true
+    inbound_nodes:
+    - - - add_13
+        - 0
+        - 0
+        - &id015 {}
+      - - conv1d_14
+        - 0
+        - 0
+        - *id015
+    name: add_14
+  - class_name: Conv1D
+    config:
+      activation: linear
+      activity_regularizer: null
+      bias_constraint: null
+      bias_initializer:
+        class_name: Zeros
+        config: {}
+      bias_regularizer: null
+      data_format: channels_last
+      dilation_rate: !!python/tuple
+      - 1
+      dtype: float32
+      filters: 48
+      kernel_constraint: null
+      kernel_initializer:
+        class_name: GlorotUniform
+        config:
+          seed: null
+      kernel_regularizer: null
+      kernel_size: !!python/tuple
+      - 32
+      name: tcn_dilated_conv_1_tanh_s3
+      padding: same
+      strides: !!python/tuple
+      - 1
+      trainable: true
+      use_bias: true
+    inbound_nodes:
+    - - - add_14
+        - 0
+        - 0
+        - {}
+    name: tcn_dilated_conv_1_tanh_s3
+  - class_name: Activation
+    config:
+      activation: relu
+      dtype: float32
+      name: activation_15
+      trainable: true
+    inbound_nodes:
+    - - - tcn_dilated_conv_1_tanh_s3
+        - 0
+        - 0
+        - {}
+    name: activation_15
+  - class_name: Lambda
+    config:
+      arguments: !!python/object/apply:builtins.dict
+      - {}
+      dtype: float32
+      function: !!python/tuple
+      - '4wEAAAAAAAAAAwAAAAUAAABDAAAAcyYAAAB0AGoBdACgAnwAoQFkAWQCZAONA2QEFwB9AXwAfAEb
+
+        AH0CfAJTACkF+vMgTm9ybWFsaXplIGEgbGF5ZXIgdG8gdGhlIG1heGltdW0gYWN0aXZhdGlvbgoK
+
+        ICAgIFRoaXMga2VlcHMgYSBsYXllcnMgdmFsdWVzIGJldHdlZW4gemVybyBhbmQgb25lLgogICAg
+
+        SXQgaGVscHMgd2l0aCByZWx1J3MgdW5ib3VuZGVkIGFjdGl2YXRpb24KCiAgICBBcmdzOgogICAg
+
+        ICAgIHg6IFRoZSBsYXllciB0byBub3JtYWxpemUKCiAgICBSZXR1cm5zOgogICAgICAgIEEgbWF4
+
+        aW1hbCBub3JtYWxpemVkIGxheWVyCiAgICDpAgAAAFQpAdoIa2VlcGRpbXNn8WjjiLX45D4pA9oB
+
+        S9oDbWF42gNhYnMpA9oBeFoKbWF4X3ZhbHVlc9oDb3V0qQByCQAAAPoqL3NjcmF0Y2gyL2NsZW1l
+
+        bnMxMC9kc3Mvc3JjL2Rzcy90Y24vdGNuLnB52hVjaGFubmVsX25vcm1hbGl6YXRpb24OAAAAcwYA
+
+        AAAADRoBCAE=
+
+        '
+      - null
+      - null
+      function_type: lambda
+      module: dss.tcn.tcn
+      name: lambda_15
+      output_shape: null
+      output_shape_module: null
+      output_shape_type: raw
+      trainable: true
+    inbound_nodes:
+    - - - activation_15
+        - 0
+        - 0
+        - {}
+    name: lambda_15
+  - class_name: SpatialDropout1D
+    config:
+      dtype: float32
+      name: tcn_spatial_dropout1d_1_s3_0.000000
+      noise_shape: null
+      rate: 0.0
+      seed: null
+      trainable: true
+    inbound_nodes:
+    - - - lambda_15
+        - 0
+        - 0
+        - {}
+    name: tcn_spatial_dropout1d_1_s3_0.000000
+  - class_name: Conv1D
+    config:
+      activation: linear
+      activity_regularizer: null
+      bias_constraint: null
+      bias_initializer:
+        class_name: Zeros
+        config: {}
+      bias_regularizer: null
+      data_format: channels_last
+      dilation_rate: !!python/tuple
+      - 1
+      dtype: float32
+      filters: 48
+      kernel_constraint: null
+      kernel_initializer:
+        class_name: GlorotUniform
+        config:
+          seed: null
+      kernel_regularizer: null
+      kernel_size: !!python/tuple
+      - 1
+      name: conv1d_15
+      padding: same
+      strides: !!python/tuple
+      - 1
+      trainable: true
+      use_bias: true
+    inbound_nodes:
+    - - - tcn_spatial_dropout1d_1_s3_0.000000
+        - 0
+        - 0
+        - {}
+    name: conv1d_15
+  - class_name: Add
+    config:
+      dtype: float32
+      name: add_15
+      trainable: true
+    inbound_nodes:
+    - - - add_14
+        - 0
+        - 0
+        - &id016 {}
+      - - conv1d_15
+        - 0
+        - 0
+        - *id016
+    name: add_15
+  - class_name: Conv1D
+    config:
+      activation: linear
+      activity_regularizer: null
+      bias_constraint: null
+      bias_initializer:
+        class_name: Zeros
+        config: {}
+      bias_regularizer: null
+      data_format: channels_last
+      dilation_rate: !!python/tuple
+      - 2
+      dtype: float32
+      filters: 48
+      kernel_constraint: null
+      kernel_initializer:
+        class_name: GlorotUniform
+        config:
+          seed: null
+      kernel_regularizer: null
+      kernel_size: !!python/tuple
+      - 32
+      name: tcn_dilated_conv_2_tanh_s3
+      padding: same
+      strides: !!python/tuple
+      - 1
+      trainable: true
+      use_bias: true
+    inbound_nodes:
+    - - - add_15
+        - 0
+        - 0
+        - {}
+    name: tcn_dilated_conv_2_tanh_s3
+  - class_name: Activation
+    config:
+      activation: relu
+      dtype: float32
+      name: activation_16
+      trainable: true
+    inbound_nodes:
+    - - - tcn_dilated_conv_2_tanh_s3
+        - 0
+        - 0
+        - {}
+    name: activation_16
+  - class_name: Lambda
+    config:
+      arguments: !!python/object/apply:builtins.dict
+      - {}
+      dtype: float32
+      function: !!python/tuple
+      - '4wEAAAAAAAAAAwAAAAUAAABDAAAAcyYAAAB0AGoBdACgAnwAoQFkAWQCZAONA2QEFwB9AXwAfAEb
+
+        AH0CfAJTACkF+vMgTm9ybWFsaXplIGEgbGF5ZXIgdG8gdGhlIG1heGltdW0gYWN0aXZhdGlvbgoK
+
+        ICAgIFRoaXMga2VlcHMgYSBsYXllcnMgdmFsdWVzIGJldHdlZW4gemVybyBhbmQgb25lLgogICAg
+
+        SXQgaGVscHMgd2l0aCByZWx1J3MgdW5ib3VuZGVkIGFjdGl2YXRpb24KCiAgICBBcmdzOgogICAg
+
+        ICAgIHg6IFRoZSBsYXllciB0byBub3JtYWxpemUKCiAgICBSZXR1cm5zOgogICAgICAgIEEgbWF4
+
+        aW1hbCBub3JtYWxpemVkIGxheWVyCiAgICDpAgAAAFQpAdoIa2VlcGRpbXNn8WjjiLX45D4pA9oB
+
+        S9oDbWF42gNhYnMpA9oBeFoKbWF4X3ZhbHVlc9oDb3V0qQByCQAAAPoqL3NjcmF0Y2gyL2NsZW1l
+
+        bnMxMC9kc3Mvc3JjL2Rzcy90Y24vdGNuLnB52hVjaGFubmVsX25vcm1hbGl6YXRpb24OAAAAcwYA
+
+        AAAADRoBCAE=
+
+        '
+      - null
+      - null
+      function_type: lambda
+      module: dss.tcn.tcn
+      name: lambda_16
+      output_shape: null
+      output_shape_module: null
+      output_shape_type: raw
+      trainable: true
+    inbound_nodes:
+    - - - activation_16
+        - 0
+        - 0
+        - {}
+    name: lambda_16
+  - class_name: SpatialDropout1D
+    config:
+      dtype: float32
+      name: tcn_spatial_dropout1d_2_s3_0.000000
+      noise_shape: null
+      rate: 0.0
+      seed: null
+      trainable: true
+    inbound_nodes:
+    - - - lambda_16
+        - 0
+        - 0
+        - {}
+    name: tcn_spatial_dropout1d_2_s3_0.000000
+  - class_name: Conv1D
+    config:
+      activation: linear
+      activity_regularizer: null
+      bias_constraint: null
+      bias_initializer:
+        class_name: Zeros
+        config: {}
+      bias_regularizer: null
+      data_format: channels_last
+      dilation_rate: !!python/tuple
+      - 1
+      dtype: float32
+      filters: 48
+      kernel_constraint: null
+      kernel_initializer:
+        class_name: GlorotUniform
+        config:
+          seed: null
+      kernel_regularizer: null
+      kernel_size: !!python/tuple
+      - 1
+      name: conv1d_16
+      padding: same
+      strides: !!python/tuple
+      - 1
+      trainable: true
+      use_bias: true
+    inbound_nodes:
+    - - - tcn_spatial_dropout1d_2_s3_0.000000
+        - 0
+        - 0
+        - {}
+    name: conv1d_16
+  - class_name: Add
+    config:
+      dtype: float32
+      name: add_16
+      trainable: true
+    inbound_nodes:
+    - - - add_15
+        - 0
+        - 0
+        - &id017 {}
+      - - conv1d_16
+        - 0
+        - 0
+        - *id017
+    name: add_16
+  - class_name: Conv1D
+    config:
+      activation: linear
+      activity_regularizer: null
+      bias_constraint: null
+      bias_initializer:
+        class_name: Zeros
+        config: {}
+      bias_regularizer: null
+      data_format: channels_last
+      dilation_rate: !!python/tuple
+      - 4
+      dtype: float32
+      filters: 48
+      kernel_constraint: null
+      kernel_initializer:
+        class_name: GlorotUniform
+        config:
+          seed: null
+      kernel_regularizer: null
+      kernel_size: !!python/tuple
+      - 32
+      name: tcn_dilated_conv_4_tanh_s3
+      padding: same
+      strides: !!python/tuple
+      - 1
+      trainable: true
+      use_bias: true
+    inbound_nodes:
+    - - - add_16
+        - 0
+        - 0
+        - {}
+    name: tcn_dilated_conv_4_tanh_s3
+  - class_name: Activation
+    config:
+      activation: relu
+      dtype: float32
+      name: activation_17
+      trainable: true
+    inbound_nodes:
+    - - - tcn_dilated_conv_4_tanh_s3
+        - 0
+        - 0
+        - {}
+    name: activation_17
+  - class_name: Lambda
+    config:
+      arguments: !!python/object/apply:builtins.dict
+      - {}
+      dtype: float32
+      function: !!python/tuple
+      - '4wEAAAAAAAAAAwAAAAUAAABDAAAAcyYAAAB0AGoBdACgAnwAoQFkAWQCZAONA2QEFwB9AXwAfAEb
+
+        AH0CfAJTACkF+vMgTm9ybWFsaXplIGEgbGF5ZXIgdG8gdGhlIG1heGltdW0gYWN0aXZhdGlvbgoK
+
+        ICAgIFRoaXMga2VlcHMgYSBsYXllcnMgdmFsdWVzIGJldHdlZW4gemVybyBhbmQgb25lLgogICAg
+
+        SXQgaGVscHMgd2l0aCByZWx1J3MgdW5ib3VuZGVkIGFjdGl2YXRpb24KCiAgICBBcmdzOgogICAg
+
+        ICAgIHg6IFRoZSBsYXllciB0byBub3JtYWxpemUKCiAgICBSZXR1cm5zOgogICAgICAgIEEgbWF4
+
+        aW1hbCBub3JtYWxpemVkIGxheWVyCiAgICDpAgAAAFQpAdoIa2VlcGRpbXNn8WjjiLX45D4pA9oB
+
+        S9oDbWF42gNhYnMpA9oBeFoKbWF4X3ZhbHVlc9oDb3V0qQByCQAAAPoqL3NjcmF0Y2gyL2NsZW1l
+
+        bnMxMC9kc3Mvc3JjL2Rzcy90Y24vdGNuLnB52hVjaGFubmVsX25vcm1hbGl6YXRpb24OAAAAcwYA
+
+        AAAADRoBCAE=
+
+        '
+      - null
+      - null
+      function_type: lambda
+      module: dss.tcn.tcn
+      name: lambda_17
+      output_shape: null
+      output_shape_module: null
+      output_shape_type: raw
+      trainable: true
+    inbound_nodes:
+    - - - activation_17
+        - 0
+        - 0
+        - {}
+    name: lambda_17
+  - class_name: SpatialDropout1D
+    config:
+      dtype: float32
+      name: tcn_spatial_dropout1d_4_s3_0.000000
+      noise_shape: null
+      rate: 0.0
+      seed: null
+      trainable: true
+    inbound_nodes:
+    - - - lambda_17
+        - 0
+        - 0
+        - {}
+    name: tcn_spatial_dropout1d_4_s3_0.000000
+  - class_name: Conv1D
+    config:
+      activation: linear
+      activity_regularizer: null
+      bias_constraint: null
+      bias_initializer:
+        class_name: Zeros
+        config: {}
+      bias_regularizer: null
+      data_format: channels_last
+      dilation_rate: !!python/tuple
+      - 1
+      dtype: float32
+      filters: 48
+      kernel_constraint: null
+      kernel_initializer:
+        class_name: GlorotUniform
+        config:
+          seed: null
+      kernel_regularizer: null
+      kernel_size: !!python/tuple
+      - 1
+      name: conv1d_17
+      padding: same
+      strides: !!python/tuple
+      - 1
+      trainable: true
+      use_bias: true
+    inbound_nodes:
+    - - - tcn_spatial_dropout1d_4_s3_0.000000
+        - 0
+        - 0
+        - {}
+    name: conv1d_17
+  - class_name: Add
+    config:
+      dtype: float32
+      name: add_17
+      trainable: true
+    inbound_nodes:
+    - - - add_16
+        - 0
+        - 0
+        - &id018 {}
+      - - conv1d_17
+        - 0
+        - 0
+        - *id018
+    name: add_17
+  - class_name: Conv1D
+    config:
+      activation: linear
+      activity_regularizer: null
+      bias_constraint: null
+      bias_initializer:
+        class_name: Zeros
+        config: {}
+      bias_regularizer: null
+      data_format: channels_last
+      dilation_rate: !!python/tuple
+      - 8
+      dtype: float32
+      filters: 48
+      kernel_constraint: null
+      kernel_initializer:
+        class_name: GlorotUniform
+        config:
+          seed: null
+      kernel_regularizer: null
+      kernel_size: !!python/tuple
+      - 32
+      name: tcn_dilated_conv_8_tanh_s3
+      padding: same
+      strides: !!python/tuple
+      - 1
+      trainable: true
+      use_bias: true
+    inbound_nodes:
+    - - - add_17
+        - 0
+        - 0
+        - {}
+    name: tcn_dilated_conv_8_tanh_s3
+  - class_name: Activation
+    config:
+      activation: relu
+      dtype: float32
+      name: activation_18
+      trainable: true
+    inbound_nodes:
+    - - - tcn_dilated_conv_8_tanh_s3
+        - 0
+        - 0
+        - {}
+    name: activation_18
+  - class_name: Lambda
+    config:
+      arguments: !!python/object/apply:builtins.dict
+      - {}
+      dtype: float32
+      function: !!python/tuple
+      - '4wEAAAAAAAAAAwAAAAUAAABDAAAAcyYAAAB0AGoBdACgAnwAoQFkAWQCZAONA2QEFwB9AXwAfAEb
+
+        AH0CfAJTACkF+vMgTm9ybWFsaXplIGEgbGF5ZXIgdG8gdGhlIG1heGltdW0gYWN0aXZhdGlvbgoK
+
+        ICAgIFRoaXMga2VlcHMgYSBsYXllcnMgdmFsdWVzIGJldHdlZW4gemVybyBhbmQgb25lLgogICAg
+
+        SXQgaGVscHMgd2l0aCByZWx1J3MgdW5ib3VuZGVkIGFjdGl2YXRpb24KCiAgICBBcmdzOgogICAg
+
+        ICAgIHg6IFRoZSBsYXllciB0byBub3JtYWxpemUKCiAgICBSZXR1cm5zOgogICAgICAgIEEgbWF4
+
+        aW1hbCBub3JtYWxpemVkIGxheWVyCiAgICDpAgAAAFQpAdoIa2VlcGRpbXNn8WjjiLX45D4pA9oB
+
+        S9oDbWF42gNhYnMpA9oBeFoKbWF4X3ZhbHVlc9oDb3V0qQByCQAAAPoqL3NjcmF0Y2gyL2NsZW1l
+
+        bnMxMC9kc3Mvc3JjL2Rzcy90Y24vdGNuLnB52hVjaGFubmVsX25vcm1hbGl6YXRpb24OAAAAcwYA
+
+        AAAADRoBCAE=
+
+        '
+      - null
+      - null
+      function_type: lambda
+      module: dss.tcn.tcn
+      name: lambda_18
+      output_shape: null
+      output_shape_module: null
+      output_shape_type: raw
+      trainable: true
+    inbound_nodes:
+    - - - activation_18
+        - 0
+        - 0
+        - {}
+    name: lambda_18
+  - class_name: SpatialDropout1D
+    config:
+      dtype: float32
+      name: tcn_spatial_dropout1d_8_s3_0.000000
+      noise_shape: null
+      rate: 0.0
+      seed: null
+      trainable: true
+    inbound_nodes:
+    - - - lambda_18
+        - 0
+        - 0
+        - {}
+    name: tcn_spatial_dropout1d_8_s3_0.000000
+  - class_name: Conv1D
+    config:
+      activation: linear
+      activity_regularizer: null
+      bias_constraint: null
+      bias_initializer:
+        class_name: Zeros
+        config: {}
+      bias_regularizer: null
+      data_format: channels_last
+      dilation_rate: !!python/tuple
+      - 1
+      dtype: float32
+      filters: 48
+      kernel_constraint: null
+      kernel_initializer:
+        class_name: GlorotUniform
+        config:
+          seed: null
+      kernel_regularizer: null
+      kernel_size: !!python/tuple
+      - 1
+      name: conv1d_18
+      padding: same
+      strides: !!python/tuple
+      - 1
+      trainable: true
+      use_bias: true
+    inbound_nodes:
+    - - - tcn_spatial_dropout1d_8_s3_0.000000
+        - 0
+        - 0
+        - {}
+    name: conv1d_18
+  - class_name: Add
+    config:
+      dtype: float32
+      name: add_18
+      trainable: true
+    inbound_nodes:
+    - - - add_17
+        - 0
+        - 0
+        - &id019 {}
+      - - conv1d_18
+        - 0
+        - 0
+        - *id019
+    name: add_18
+  - class_name: Conv1D
+    config:
+      activation: linear
+      activity_regularizer: null
+      bias_constraint: null
+      bias_initializer:
+        class_name: Zeros
+        config: {}
+      bias_regularizer: null
+      data_format: channels_last
+      dilation_rate: !!python/tuple
+      - 16
+      dtype: float32
+      filters: 48
+      kernel_constraint: null
+      kernel_initializer:
+        class_name: GlorotUniform
+        config:
+          seed: null
+      kernel_regularizer: null
+      kernel_size: !!python/tuple
+      - 32
+      name: tcn_dilated_conv_16_tanh_s3
+      padding: same
+      strides: !!python/tuple
+      - 1
+      trainable: true
+      use_bias: true
+    inbound_nodes:
+    - - - add_18
+        - 0
+        - 0
+        - {}
+    name: tcn_dilated_conv_16_tanh_s3
+  - class_name: Activation
+    config:
+      activation: relu
+      dtype: float32
+      name: activation_19
+      trainable: true
+    inbound_nodes:
+    - - - tcn_dilated_conv_16_tanh_s3
+        - 0
+        - 0
+        - {}
+    name: activation_19
+  - class_name: Lambda
+    config:
+      arguments: !!python/object/apply:builtins.dict
+      - {}
+      dtype: float32
+      function: !!python/tuple
+      - '4wEAAAAAAAAAAwAAAAUAAABDAAAAcyYAAAB0AGoBdACgAnwAoQFkAWQCZAONA2QEFwB9AXwAfAEb
+
+        AH0CfAJTACkF+vMgTm9ybWFsaXplIGEgbGF5ZXIgdG8gdGhlIG1heGltdW0gYWN0aXZhdGlvbgoK
+
+        ICAgIFRoaXMga2VlcHMgYSBsYXllcnMgdmFsdWVzIGJldHdlZW4gemVybyBhbmQgb25lLgogICAg
+
+        SXQgaGVscHMgd2l0aCByZWx1J3MgdW5ib3VuZGVkIGFjdGl2YXRpb24KCiAgICBBcmdzOgogICAg
+
+        ICAgIHg6IFRoZSBsYXllciB0byBub3JtYWxpemUKCiAgICBSZXR1cm5zOgogICAgICAgIEEgbWF4
+
+        aW1hbCBub3JtYWxpemVkIGxheWVyCiAgICDpAgAAAFQpAdoIa2VlcGRpbXNn8WjjiLX45D4pA9oB
+
+        S9oDbWF42gNhYnMpA9oBeFoKbWF4X3ZhbHVlc9oDb3V0qQByCQAAAPoqL3NjcmF0Y2gyL2NsZW1l
+
+        bnMxMC9kc3Mvc3JjL2Rzcy90Y24vdGNuLnB52hVjaGFubmVsX25vcm1hbGl6YXRpb24OAAAAcwYA
+
+        AAAADRoBCAE=
+
+        '
+      - null
+      - null
+      function_type: lambda
+      module: dss.tcn.tcn
+      name: lambda_19
+      output_shape: null
+      output_shape_module: null
+      output_shape_type: raw
+      trainable: true
+    inbound_nodes:
+    - - - activation_19
+        - 0
+        - 0
+        - {}
+    name: lambda_19
+  - class_name: SpatialDropout1D
+    config:
+      dtype: float32
+      name: tcn_spatial_dropout1d_16_s3_0.000000
+      noise_shape: null
+      rate: 0.0
+      seed: null
+      trainable: true
+    inbound_nodes:
+    - - - lambda_19
+        - 0
+        - 0
+        - {}
+    name: tcn_spatial_dropout1d_16_s3_0.000000
+  - class_name: Conv1D
+    config:
+      activation: linear
+      activity_regularizer: null
+      bias_constraint: null
+      bias_initializer:
+        class_name: Zeros
+        config: {}
+      bias_regularizer: null
+      data_format: channels_last
+      dilation_rate: !!python/tuple
+      - 1
+      dtype: float32
+      filters: 48
+      kernel_constraint: null
+      kernel_initializer:
+        class_name: GlorotUniform
+        config:
+          seed: null
+      kernel_regularizer: null
+      kernel_size: !!python/tuple
+      - 1
+      name: conv1d_19
+      padding: same
+      strides: !!python/tuple
+      - 1
+      trainable: true
+      use_bias: true
+    inbound_nodes:
+    - - - tcn_spatial_dropout1d_16_s3_0.000000
+        - 0
+        - 0
+        - {}
+    name: conv1d_19
+  - class_name: Add
+    config:
+      dtype: float32
+      name: add_20
+      trainable: true
+    inbound_nodes:
+    - - - conv1d
+        - 0
+        - 0
+        - &id020 {}
+      - - conv1d_1
+        - 0
+        - 0
+        - *id020
+      - - conv1d_2
+        - 0
+        - 0
+        - *id020
+      - - conv1d_3
+        - 0
+        - 0
+        - *id020
+      - - conv1d_4
+        - 0
+        - 0
+        - *id020
+      - - conv1d_5
+        - 0
+        - 0
+        - *id020
+      - - conv1d_6
+        - 0
+        - 0
+        - *id020
+      - - conv1d_7
+        - 0
+        - 0
+        - *id020
+      - - conv1d_8
+        - 0
+        - 0
+        - *id020
+      - - conv1d_9
+        - 0
+        - 0
+        - *id020
+      - - conv1d_10
+        - 0
+        - 0
+        - *id020
+      - - conv1d_11
+        - 0
+        - 0
+        - *id020
+      - - conv1d_12
+        - 0
+        - 0
+        - *id020
+      - - conv1d_13
+        - 0
+        - 0
+        - *id020
+      - - conv1d_14
+        - 0
+        - 0
+        - *id020
+      - - conv1d_15
+        - 0
+        - 0
+        - *id020
+      - - conv1d_16
+        - 0
+        - 0
+        - *id020
+      - - conv1d_17
+        - 0
+        - 0
+        - *id020
+      - - conv1d_18
+        - 0
+        - 0
+        - *id020
+      - - conv1d_19
+        - 0
+        - 0
+        - *id020
+    name: add_20
+  - class_name: Activation
+    config:
+      activation: relu
+      dtype: float32
+      name: activation_20
+      trainable: true
+    inbound_nodes:
+    - - - add_20
+        - 0
+        - 0
+        - {}
+    name: activation_20
+  - class_name: Dense
+    config:
+      activation: linear
+      activity_regularizer: null
+      bias_constraint: null
+      bias_initializer:
+        class_name: Zeros
+        config: {}
+      bias_regularizer: null
+      dtype: float32
+      kernel_constraint: null
+      kernel_initializer:
+        class_name: GlorotUniform
+        config:
+          seed: null
+      kernel_regularizer: null
+      name: dense
+      trainable: true
+      units: 2
+      use_bias: true
+    inbound_nodes:
+    - - - activation_20
+        - 0
+        - 0
+        - {}
+    name: dense
+  - class_name: Activation
+    config:
+      activation: softmax
+      dtype: float32
+      name: activation_21
+      trainable: true
+    inbound_nodes:
+    - - - dense
+        - 0
+        - 0
+        - {}
+    name: activation_21
+  name: TCN
+  output_layers:
+  - - activation_21
+    - 0
+    - 0
+keras_version: 2.2.4-tf
