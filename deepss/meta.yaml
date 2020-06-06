@@ -1,0 +1,6 @@
+name: deepss
+description: Segment song in recording. For more information see source code https://github.com/janclemenslab/deepsongsegmenter.
+input:
+  - hdf5 files (*_daq.h5)
+output:
+  - segmentation file (*.h5)

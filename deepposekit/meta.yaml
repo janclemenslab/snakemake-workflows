@@ -1,0 +1,7 @@
+name: deepposekit
+description: Track flies in video. For more information see http://deepposekit.org.
+input:
+  - video files (.mp4)
+  - ethotracker files (*_tracks.h5)
+output:
+  - pose tracks files (*_deepposekit.h5)
