@@ -1,6 +1,8 @@
 name: sleap
 description: Track flies and poses in video. For more information see https://sleap.ai.
 input:
-  - video files (.mp4)
+  - video files (mp4)
 output:
-  - tracks file (*_sleap.h5)
+  - tracks file (h5)
+required_params:
+  - modelname
