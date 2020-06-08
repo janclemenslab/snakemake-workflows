@@ -6,4 +6,8 @@ input:
 output:
   - pose tracks files (h5)
 required_params:
-  - modelname
+  - tracksfilename (from ethotracker)
+  - savename
+  - modelname (produced by deepposekit )
+help:
+  - Expects `skeleton_initialized.csv` in the same folder as the model.

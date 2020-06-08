@@ -1,10 +1,10 @@
 name: sleap
 channels:
-  - sleap
   - defaults
 dependencies:
   - python=3.6
-  - tensorflow=2
-  - Shapely
+  - pip
+  - git
+  - tensorflow-gpu=2.1
   - pip:
     - sleap
