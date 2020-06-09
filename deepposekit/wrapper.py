@@ -17,12 +17,12 @@ import os
 
 
 def deepposekit(tracksfilename: str, savename:str, modelname: str):
+
     datename = os.path.split(os.path.split(tracksfilename)[0])[1]
     root = os.getcwd()
 
-    model_filename = modelname  #f'../snakemake-workflows/deepposekit/models/{modelname}'
-    logging.info(f'using model from {model_filename}')
-    model = load_model(model_filename)
+    logging.info(f'using model from {modelname}')
+    model = load_model(modelname)
 
     logging.info(f'assembling data for {datename}')
     dataset = xb.assemble(datename, root, dat_path='dat', res_path='res')
@@ -54,22 +54,14 @@ def deepposekit(tracksfilename: str, savename:str, modelname: str):
 
     batch_idx = list(range(0, nb_frames, batch_size))
     nb_batches = len(batch_idx) - 1
-    # batch_idx.append(int(frame_stop - frame_start - 2))
 
     poses = np.full((frame_stop, nb_flies, nb_parts, 2), np.nan)
-    # poses[:] = np.nan
     poses_confidence = np.full((frame_stop, nb_flies, nb_parts, 1), np.nan)
     box_centers_from_batches = np.full((frame_stop, nb_flies, 2), np.nan)
-    # box_centers_from_batches[:] = np.nan
-    # pbar = tqdm(total=frame_stop, unit='frames')
-    print('batch_idx', len(batch_idx))
-    print('nb_batches', nb_batches)
-    print(vr)
-    print('nb_frames (vr)', len(vr))
-    print('frame_numbers', len(frame_numbers))
-    print('frame_indices', len(frame_indices))
+
     for batch_num in range(nb_batches):
         logging.info(f"PROCESSING BATCH {batch_num:03d}/{nb_batches} (frames {frame_numbers[batch_idx[batch_num]]}-{frame_numbers[batch_idx[batch_num + 1]]}).")
+
         batch_frame_numbers = list(range(frame_numbers[batch_idx[batch_num]], frame_numbers[batch_idx[batch_num + 1]]))
         box_centers_batch = box_centers[batch_idx[batch_num]:batch_idx[batch_num + 1]]
 
@@ -87,7 +79,7 @@ def deepposekit(tracksfilename: str, savename:str, modelname: str):
             boxes = boxes
         else:
             boxes = boxes[..., :1]
-        # logging.info(f'estimating poses:')
+
         predictions = model.predict(boxes, batch_size=100, verbose=0)
         positions, confidence, _ = np.split(predictions, (2, 3), -1)
         box_centers_batch_flat = box_centers_batch.reshape((-1, 2))
@@ -95,8 +87,7 @@ def deepposekit(tracksfilename: str, savename:str, modelname: str):
             poses[frame, fly, ...] = pred
             poses_confidence[frame, fly, ...] = conf
             box_centers_from_batches[frame, fly, ...] = box_center
-    #     pbar.update(fly_frame[-1])
-    # pbar.close()
+
     # convert to xarray and save to zarr
     poses = poses[..., ::-1]  # all data are in y/x - except for deepposekit - swap here to have order of coords like everywhere else
     poses = xr.DataArray(poses,
@@ -111,7 +102,7 @@ def deepposekit(tracksfilename: str, savename:str, modelname: str):
                                coords={'coords': ['y', 'x']})
 
     ds = xr.Dataset({"poses": poses, "poses_confidence": poses_confidence, "box_centers": box_centers},
-                    attrs={'model_filename': model_filename,
+                    attrs={'modelname': modelname,
                            'box_size': box_size,
                            'modelname': modelname,
                            'bgsub': 'bgsub' in modelname,
