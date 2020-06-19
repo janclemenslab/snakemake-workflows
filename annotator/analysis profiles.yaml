@@ -1,0 +1,8 @@
+main:
+  - name: analyses_profiles
+    label: Analysis profiles(video and audio annotation)
+    type: stacked
+    default: "None"
+    options: "None"  # will be populated by files in profiles
+    None:  # empty default
+
