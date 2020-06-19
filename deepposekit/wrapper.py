@@ -5,15 +5,12 @@ from videoreader import VideoReader
 import leap_utils as lu
 import xarray_behave as xb
 from leap_utils import preprocessing
-# from leap_utils.utils import iswin, islinux, ismac
 from pathlib import Path
 import xarray as xr
 import pandas as pd
 import logging
 import zarr
-# import dqefopt
 import os
-# from tqdm import tqdm
 
 
 def deepposekit(tracksfilename: str, savename:str, modelname: str):

@@ -1,8 +1,37 @@
 name: sleap
 description: Track flies and poses in video. For more information see https://sleap.ai.
 input:
-  - video files (mp4)
+  - input.video: video file (mp4)
 output:
-  - tracks file (h5)
-required_params:
-  - modelname
+  - '*_sleap.h5': tracks file (h5)
+params:
+  - name: sleap.modelname
+    label: sleap model (centroids) (REQUIRED)
+    type: file_dir
+    default: ../snakemake-workflows/sleap/models/backlight
+    help: "Path to the directory contain subdirectories with individual sleap models.\n
+          For instance one for the position (centroi)\n
+          and one for the pose (centered instance) tracking."
+  - name: sleap.tracking.tracker
+    label: sleap tracking method
+    type: list
+    default: flow
+    options: simple,flow,None
+  - name: sleap.tracking.clean_instance_count
+    label: sleap number of flies
+    type: int
+    default: 0
+  - name: sleap.tracking.similarity
+    label: sleap tracking similarity method
+    type: list
+    default: instance
+    options: instance, centroid, iou
+  - name: sleap.tracking.match
+    label: sleap tracking matching method
+    type: list
+    default: hungarian
+    options: hungarian,greedy
+  - name: sleap.tracking.track_window
+    label: sleap tracking window
+    type: int
+    default: 10

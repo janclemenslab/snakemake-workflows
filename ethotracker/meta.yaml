@@ -1,9 +1,26 @@
 name: ethotracker
 description: Track flies in video. For more information see source code https://github.com/janclemenslab/ethotracker.
 input:
-  - video files (mp4)
+  - input.video: video file (mp4)
 output:
-  - tracks file (h5)
-required_params:
-  - profile
-  - threshold
+  - "*_tracks.h5": tracks file (h5)
+params:
+  - name: tracks.processor
+    label: ethotracker profile (centroid tracking)
+    type: list
+    default: playback
+    options: chaining,playback,playback_red,playback_fix,chaining_hires,chaining_coarse,new
+  - name: tracks.threshold
+    label: ethotracker threshold (centroid tracking)
+    type: float
+    default: 0.2
+    range: 0,1
+  - name: tracks.nflies
+    label: ethotracker number of flies per chamber
+    type: int
+    default: 1
+    range: 0, 100
+  - name: tracks.led-coords
+    label: ethotracker led roi (pixels)
+    type: string
+    default: "1240 842 1640 922"

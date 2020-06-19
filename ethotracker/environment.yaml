@@ -1,26 +1,8 @@
 name: track
 channels:
-  - conda-forge
   - defaults
 dependencies:
   - python=3.7
-  - numpy
-  - scipy
-  - h5py
-  - peakutils
-  - opencv
-  - pandas
-  - pyyaml
-  - matplotlib
-  - scikit-image
-  - scikit-learn
-  - xarray
-  - deepdish
-  - pip
-  - git
   - pip:
-    - flammkuchen
-    - pyvideoreader
-    - defopt
-    - git+https://github.com/janclemenslab/ethotracker.git@db8dd388b0d2bdcbdb353dcf5d4fdfd2073bfa2c
+    - git+https://github.com/janclemenslab/ethotracker.git@bd251287b25c1168a1c310060c2293b06f57a75d
     - git+https://github.com/postpop/attrdict

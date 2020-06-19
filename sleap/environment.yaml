@@ -1,10 +1,43 @@
-name: sleap
-channels:
-  - defaults
+# name: test_sleap
+# channels:
+#   - defaults
+# dependencies:
+#   - python=3.7
+#   - pip
+#   - git
+#   - pip:
+#     - sleap
+#     - tensorflow-gpu==2.0
+
+name: test_sleap
 dependencies:
   - python=3.6
-  - pip
-  - git
+  - numpy>=1.16
+  - attrs=19.3
+  - jsonpickle=1.2
+  - networkx
   - tensorflow-gpu=2.1
+  - tensorboard=2.1
+  - scikit-learn
+  - h5py
+  - pandas
+  - Pillow
+  - Shapely
+  - psutil
+  - pyzmq
+  - pyyaml
+  - python-rapidjson
+  - pip
   - pip:
-    - sleap
+      - opencv-python-headless==4.2.0.34
+      - PySide2>=5.12.0,<=5.14.1
+      - imgaug==0.3.0
+      - cattrs==1.0.0rc0
+      - qimage2ndarray==1.8
+      - imgstore==0.2.9
+      - jsmin
+      - seaborn
+      - scikit-video
+      - sleap
+      # - "--editable=./"
+      # - "--requirement=./dev_requirements.txt"

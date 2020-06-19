@@ -4,5 +4,5 @@ input:
   - hdf5 files (h5)
 output:
   - segmentation file (h5)
-required_params:
+params:
   - modelname
