@@ -1,0 +1,13 @@
+,name,parent,swap,x,y,annotated,tree,swap_index
+0,head,,,62.109375,37.265625,True,-1,-1
+1,neck,head,,63.28125,49.21875,True,0,-1
+2,forelegL,thorax,forelegR,53.671875,33.515625,True,8,5
+3,midlegL,thorax,midlegR,29.0625,50.390625,True,8,6
+4,hindlegL,thorax,hindlegR,47.109375,88.125,True,8,7
+5,forelegR,thorax,forelegL,69.140625,32.34375,True,8,2
+6,midlegR,thorax,midlegL,86.484375,53.90625,True,8,3
+7,hindlegR,thorax,hindlegL,70.78125,90.703125,True,8,4
+8,thorax,neck,,62.8125,64.6875,True,1,-1
+9,wingL,neck,wingR,35.625,86.71875,True,1,10
+10,wingR,neck,wingL,70.078125,94.921875,True,1,9
+11,abdomen,thorax,,61.171875,80.390625,True,8,-1
