@@ -3,6 +3,7 @@ channels:
   - defaults
 dependencies:
   - python=3.7
+  - pip
   - pip:
-    - git+https://github.com/janclemenslab/ethotracker.git@c83ec05c42cb3c80186040ebf00bc3eec9f82bd3
+    - git+https://github.com/janclemenslab/ethotracker.git@a97b56ec7ad2872d74c15eecf52ef233041df24a
     - git+https://github.com/postpop/attrdict

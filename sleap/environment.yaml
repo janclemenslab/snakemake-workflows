@@ -9,7 +9,7 @@
 #     - sleap
 #     - tensorflow-gpu==2.0
 
-name: test_sleap
+name: sleap
 dependencies:
   - python=3.6
   - numpy>=1.16

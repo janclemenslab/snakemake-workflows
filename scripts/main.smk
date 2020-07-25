@@ -2,11 +2,9 @@ import yaml
 import os
 import shutil
 from collections import defaultdict
-from pprint import pprint
-
-
 import yaml
 from typing import Any, IO, Dict
+
 
 class Loader(yaml.SafeLoader):
     """YAML Loader with `!include` constructor."""
@@ -116,5 +114,3 @@ for dire in directories:
         # add all to the clean rule
     targets['clean'].append(f"res/{dire}/DONE")
     targets['move'].append(f"dat.processed/{dire}")
-
-pprint(dict(targets))
