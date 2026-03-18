@@ -1,7 +1,8 @@
 
 .pyc
-__*
-._
+__pycache__/
+._*
+*.egg-info
 
 envs
 .envs

@@ -8,18 +8,21 @@
 ```shell
 conda create -n fab python=3.14 uv ffmpeg
 conda activate fab
-uv pip install snakemake fabric rich pyyaml uv snakemake-executor-plugin-slurm git+https://github.com/janclemenslab/etho_annotator
-
+uv pip install git+https://github.com/janclemenslab/snakemake-workflows
 ```
 - setup passwordless ssh for the cluster: [https://hpcwiki.uol.de/hpc-usage/the-basics/login/ssh-keys]
+
+#### Note on local installs (ignore)
+- if this checkout lives under a path containing `#` (for example `/Volumes/agauneu/#Data/...`), `uv pip install -e .` currently fails because `uv` misparses the local path; use `pip install -e .` locally or clone the repo to a path without `#`
 
 
 ### Usage
 - start local session in the terminal on your PC
 - go to the folder for your experiments (chainigmic, backlight etc) - on windows: `cd W:/#Data/chainingmic`
 - annotate: `fab annotate`
-- convert vids, submit jobs: `fab fixvideos submit -u USERNAME`
-- check status of tracker jobs: `fab queue -u USERNAME`
+- convert vids, submit jobs: `fab fixvideos submit --user USERNAME`
+- check status of tracker jobs: `fab queue --user USERNAME`
+- if you omit `--user USERNAME`, Fabric will use your local username
 
 ### If you want to play with the env on the cluster
 login with `ssh abcd1234@rosa.hpc.uni-oldenburg.de`,
@@ -41,6 +44,7 @@ module load Miniforge3
 conda create --prefix "/fs/s6k/groups/agauneu/#Data/snakemake-workflows/.envs/ncb" python=3.14 git uv ffmpeg
 conda activate "/fs/s6k/groups/agauneu/#Data/snakemake-workflows/.envs/ncb"
 uv pip install snakemake fabric rich pyyaml snakemake-executor-plugin-slurm
+uv pip install -e /fs/s6k/groups/agauneu/#Data/snakemake-workflows
 ```
 
 
