@@ -1,0 +1,20 @@
+slurm-no-account: true
+executor: slurm
+jobs: 999
+local-cores: 1
+rerun-incomplete: true
+keep-going: true
+notemp: true
+printshellcmds: false
+show-failed-logs: true
+latency-wait: 30
+software-deployment-method:
+  - conda
+  - env-modules
+conda-prefix: "/fs/s6k/groups/agauneu/#Data/snakemake-workflows/.envs"
+slurm-logdir: "log/slurm"
+slurm-keep-successful-logs: true
+default-resources:
+  - runtime=60
+  - mem_mb=8192
+  - slurm_partition=all_cpu.p

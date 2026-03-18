@@ -1,0 +1,13 @@
+name: das
+channels:
+  # - defaults
+  - conda-forge
+  - anaconda
+  - ncb
+  - nvidia
+variables:
+  CONDA_OVERRIDE_CUDA: 11.2
+dependencies:
+  - pandas
+  - das
+  - python=3.9

@@ -1,0 +1,12 @@
+name: split_videos
+description: Detect fly chambers in a multi-chamber video and crop one video per chamber containing a fly.
+input:
+  - input.video: video file (mp4)
+output:
+  - '*_fly_chambers': directory with cropped chamber videos, detection manifest, and debug image
+params:
+  - min_chambers
+  - crop_padding
+  - detection_padding
+  - force
+  - skip_cropping

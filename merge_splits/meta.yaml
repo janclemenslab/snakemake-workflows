@@ -1,0 +1,6 @@
+name: merge_splits
+description: Merge per-split HDF5 outputs into a single HDF5 file using external links.
+input:
+  - '*.h5': split track files
+output:
+  - '*_tracks.h5': merged tracks file

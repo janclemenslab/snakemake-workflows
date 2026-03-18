@@ -1,0 +1,7 @@
+name: merge_splits
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.14
+  - h5py

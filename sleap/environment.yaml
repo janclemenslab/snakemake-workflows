@@ -1,0 +1,9 @@
+name: sleap
+channels:
+  - conda-forge
+dependencies:
+  - pip
+  - python=3.13
+  - pip:
+    - "sleap[nn]"
+    - --extra-index-url https://download.pytorch.org/whl/cu128
