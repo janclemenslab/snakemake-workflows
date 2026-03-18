@@ -58,18 +58,10 @@ Each workflow contains:
 
 ### Existing wrappers
 
-#### SLEAP
-[sleap README](sleap/README.md)
-
-#### DAS
-[das README](das/README.md)
-
-#### split_videos
-[split_videos README](split_videos/README.md)
-
-#### merge_splits
-[merge_splits README](merge_splits/README.md)
-
+- [sleap](sleap/README.md)
+- [das](das/README.md)
+- [split_videos](split_videos/README.md)
+- [merge_splits](merge_splits/README.md)
 
 
 ## Analysis profiles
