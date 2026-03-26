@@ -11,7 +11,7 @@ rule merge_splits:
     output:
         "res/{directory}/{directory}_tracks.h5"
     wrapper:
-        "file:../snakemake-workflows/merge_splits"
+        "file:../snakemake-workflows/wrappers/merge_splits"
 ```
 
 ## Inputs

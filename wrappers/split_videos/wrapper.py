@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import json
 import math
 import subprocess
@@ -91,7 +89,9 @@ def expand_bbox(
     bbox: tuple[int, int, int, int], padding: int, width: int, height: int
 ) -> tuple[int, int, int, int]:
     x0, y0, x1, y1 = bbox
-    return clamp_bbox((x0 - padding, y0 - padding, x1 + padding, y1 + padding), width, height)
+    return clamp_bbox(
+        (x0 - padding, y0 - padding, x1 + padding, y1 + padding), width, height
+    )
 
 
 def connected_components(mask: np.ndarray, scores: np.ndarray) -> list[Component]:
@@ -262,7 +262,9 @@ def detect_fly_component(chamber_gray: np.ndarray) -> Component | None:
 
 
 def classify_chambers(
-    gray: np.ndarray, chambers: Iterable[tuple[int, int, int, int]], detection_padding: int
+    gray: np.ndarray,
+    chambers: Iterable[tuple[int, int, int, int]],
+    detection_padding: int,
 ) -> list[ChamberDetection]:
     detections: list[ChamberDetection] = []
     frame_height, frame_width = gray.shape
@@ -342,7 +344,9 @@ def crop_chamber_video(
         "fast",
         str(output_path),
     ]
-    subprocess.run(cmd, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    subprocess.run(
+        cmd, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+    )
 
 
 def get_param(name, default=None):
@@ -367,7 +371,7 @@ def main():
             f"Output dir {output_dir.name} must start with the input stem {stem}."
         )
 
-    output_suffix = output_dir.name[len(stem):]
+    output_suffix = output_dir.name[len(stem) :]
     if not output_suffix:
         raise ValueError(f"Could not infer output suffix from {output_dir}.")
 
@@ -420,7 +424,9 @@ def main():
         manifest["chambers"].append(chamber_record)
 
         if detection.has_fly and not skip_cropping:
-            output_video = output_dir / f"{video_path.stem}_chamber{detection.index:02d}.mp4"
+            output_video = (
+                output_dir / f"{video_path.stem}_chamber{detection.index:02d}.mp4"
+            )
             crop_chamber_video(
                 video_path,
                 output_video,

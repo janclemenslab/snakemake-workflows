@@ -4,6 +4,7 @@ jobs: 999
 local-cores: 1
 rerun-incomplete: true
 keep-going: true
+# slurm_account: agauneu
 notemp: true
 printshellcmds: false
 show-failed-logs: true
@@ -15,6 +16,6 @@ conda-prefix: "/fs/s6k/groups/agauneu/#Data/snakemake-workflows/.envs"
 slurm-logdir: "log/slurm"
 slurm-keep-successful-logs: true
 default-resources:
-  - runtime=60
+  - runtime=120
   - mem_mb=8192
   - slurm_partition=all_cpu.p

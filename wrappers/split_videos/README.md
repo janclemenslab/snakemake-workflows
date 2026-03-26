@@ -11,7 +11,7 @@ checkpoint split_videos:
     output:
         directory("dat/{directory}/{directory}_fly_chambers")
     wrapper:
-        "file:../snakemake-workflows/split_videos"
+        "file:../snakemake-workflows/wrappers/split_videos"
 ```
 
 ## Inputs

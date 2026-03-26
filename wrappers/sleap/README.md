@@ -15,7 +15,7 @@ rule sleap:
     log:
         "log/{directory}/{directory}_sleap.log"
     wrapper:
-        "file:../snakemake-workflows/sleap"
+        "file:../snakemake-workflows/wrappers/sleap"
 ```
 
 ## Inputs

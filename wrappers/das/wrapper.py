@@ -8,6 +8,16 @@ from typing import List, Union
 import xarray_behave as xb
 
 
+def resolve_legacy_model_path(model_path: str) -> str:
+    legacy_prefix = "../snakemake-workflows/das/models"
+    new_prefix = "../snakemake-workflows/wrappers/das/models"
+    if model_path.startswith(legacy_prefix):
+        candidate = model_path.replace(legacy_prefix, new_prefix, 1)
+        if os.path.exists(candidate):
+            return candidate
+    return model_path
+
+
 def sampletimes_to_timestamps(events, segments, ds, start_index: int = 0, suffix: str = ''):
     event_times = das.annot.Events()
     fs_song = ds.song_raw.attrs['sampling_rate_Hz']
@@ -101,6 +111,8 @@ def run_das(data_name: str, save_name: str, model_save_name: Union[List[str], st
 
     if type(model_save_name) == str:
         model_save_name = [model_save_name]
+
+    model_save_name = [resolve_legacy_model_path(model_name) for model_name in model_save_name]
 
     events = {'seconds': np.empty((0,)), 'sequence': np.empty((0,)), 'names': np.empty((0,))}
     segments = {

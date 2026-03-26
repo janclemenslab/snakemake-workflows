@@ -3,6 +3,7 @@
 __pycache__/
 ._*
 *.egg-info
+.mypy_cache
 
 envs
 .envs

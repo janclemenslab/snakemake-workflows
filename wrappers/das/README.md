@@ -13,7 +13,7 @@ rule das:
     params:
         read_annotations
     wrapper:
-        "file:../snakemake-workflows/das"
+        "file:../snakemake-workflows/wrappers/das"
 ```
 
 ## Inputs

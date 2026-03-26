@@ -8,7 +8,7 @@ params:
   - name: sleap.modelname
     label: sleap model (centroids) (REQUIRED)
     type: file_dir
-    default: ../snakemake-workflows/sleap/models/backlight
+    default: ../snakemake-workflows/wrappers/sleap/models/backlight
     help: "Path to the directory contain subdirectories with individual sleap models.\n
           For instance one for the position (centroi)\n
           and one for the pose (centered instance) tracking."

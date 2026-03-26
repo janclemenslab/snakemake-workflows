@@ -3,6 +3,16 @@ from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
 
 
+def resolve_legacy_model_dir(model_dir: str) -> str:
+    legacy_prefix = "../snakemake-workflows/sleap/models"
+    new_prefix = "../snakemake-workflows/wrappers/sleap/models"
+    if model_dir.startswith(legacy_prefix):
+        candidate = model_dir.replace(legacy_prefix, new_prefix, 1)
+        if os.path.exists(candidate):
+            return candidate
+    return model_dir
+
+
 def main():
 
     from sleap_io.io.main import load_file
@@ -46,7 +56,7 @@ def main():
     print(params)
     # modelname refers to the dir that contains the folder of the individual models
     # for a sleap pipeline (e.g. centroid and centered instance models)
-    model_dir = params.pop("modelname")
+    model_dir = resolve_legacy_model_dir(params.pop("modelname"))
     models = []
     for d in os.listdir(model_dir):
         model_path = os.path.join(model_dir, d)
