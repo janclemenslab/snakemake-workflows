@@ -20,9 +20,8 @@ uv pip install git+https://github.com/janclemenslab/snakemake-workflows
 - start local session in the terminal on your PC
 - go to the folder for your experiments (chainigmic, backlight etc) - on windows: `cd W:/#Data/chainingmic`
 - annotate: `fab annotate`
-- convert vids, submit jobs: `fab fixvideos submit --user USERNAME`
-- check status of tracker jobs: `fab queue --user USERNAME`
-- if you omit `--user USERNAME`, Fabric will use your local username
+- convert vids, submit jobs: `fab fixvideos submit --user abcd1234`
+- check status of tracker jobs: `fab queue --user abcd1234`
 
 ### If you want to play with the env on the cluster
 login with `ssh abcd1234@rosa.hpc.uni-oldenburg.de`,
