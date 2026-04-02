@@ -112,7 +112,9 @@ def _zarr_to_h5(zarr_folder, delete_zarr=False):
                 logger.warning("Could not delete zarr folder %s: %s", zarr_folder, exc)
         logger.info("Conversion complete: %s", h5_path)
     else:
-        logger.info("Skipping conversion (missing source or h5 exists): %s", zarr_folder)
+        logger.info(
+            "Skipping conversion (missing source or h5 exists): %s", zarr_folder
+        )
 
 
 def transfer_fixdaq(
@@ -122,7 +124,9 @@ def transfer_fixdaq(
 ):
     ensure_logging_configured()
     source_root = Path(source_root)
-    logger.info("Starting transfer fixdaq in %s, delete_zarr=%s", source_root, delete_zarr)
+    logger.info(
+        "Starting transfer fixdaq in %s, delete_zarr=%s", source_root, delete_zarr
+    )
 
     pattern = str(source_root / pathname_pattern)
     pathnames = glob.glob(pattern, recursive=True)
@@ -162,8 +166,8 @@ def _repair_remote_permissions(
         "set -e;"
         f"for target in {quoted_targets}; do "
         'if [ -d "$target" ]; then '
-        'chmod g+rwx "$target" >/dev/null 2>&1 || true;'
-        'chmod a+rx "$target" >/dev/null 2>&1 || true;'
+        'chmod g+rwx -R "$target" >/dev/null 2>&1 || true;'
+        'chmod a+rx -R "$target" >/dev/null 2>&1 || true;'
         "fi; "
         "done"
     )
