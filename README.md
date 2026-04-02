@@ -23,6 +23,14 @@ uv pip install git+https://github.com/janclemenslab/snakemake-workflows
 - submit jobs: `fab submit --user abcd1234`
 - check status of tracker jobs: `fab queue --user abcd1234`
 
+### Transfer from Windows
+- stage incoming folders under `~/data.transfer`
+- after installing `snakemake-workflows`, use the `transfer` command directly
+- add `--permission-user abcd1234` only if the SSH login user should differ from the default on that machine
+- run `transfer all --rig-name chainingmic` to convert DAQ zarr folders first, then move and repair the rig folders
+- run `transfer push --rig-name chainingmic` to move the folders into the SMB share and then quietly run `chmod g+rwx` and `chmod a+rx` on `<rig>/dat` and `<rig>/res` over SSH on `rosa.hpc.uni-oldenburg.de`
+- rerun `transfer fixperms --rig-name chainingmic` to reapply those chmods on the rig's `dat` and `res` folders
+
 ### If you want to play with the env on the cluster
 login with `ssh abcd1234@rosa.hpc.uni-oldenburg.de`,
 then:

@@ -8,10 +8,24 @@ version = "0.1.0"
 description = "Shared Fabric commands for the snakemake-workflows repo"
 readme = "README.md"
 requires-python = ">=3.13"
-dependencies = ["snakemake", "fabric", "rich", "pyyaml", "uv", "snakemake-executor-plugin-slurm", "etho_annotator@git+https://github.com/janclemenslab/etho_annotator"]
+dependencies = [
+    "snakemake",
+    "fabric",
+    "rich",
+    "pyyaml",
+    "uv",
+    "numpy",
+    "h5py",
+    "zarr",
+    "snakemake-executor-plugin-slurm",
+    "etho_annotator@git+https://github.com/janclemenslab/etho_annotator",
+]
 
 [project.urls]
 Repository = "https://github.com/janclemenslab/snakemake-workflows"
+
+[project.scripts]
+transfer = "fab_commands.transfer:main"
 
 [tool.setuptools]
 package-dir = {"" = "src"}
