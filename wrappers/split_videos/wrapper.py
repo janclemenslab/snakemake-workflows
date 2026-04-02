@@ -1,7 +1,6 @@
 import json
 import math
 import subprocess
-from collections import deque
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable
@@ -94,57 +93,36 @@ def expand_bbox(
     )
 
 
-def connected_components(mask: np.ndarray, scores: np.ndarray) -> list[Component]:
-    height, width = mask.shape
-    visited = np.zeros_like(mask, dtype=bool)
-    components: list[Component] = []
-    neighbors = [(-1, 0), (1, 0), (0, -1), (0, 1)]
+def resize_grayscale(image: np.ndarray, size: tuple[int, int]) -> np.ndarray:
+    return np.asarray(
+        Image.fromarray(np.clip(image, 0, 255).astype(np.uint8)).resize(
+            size, resample=Image.Resampling.BILINEAR
+        ),
+        dtype=np.float32,
+    )
 
-    ys, xs = np.where(mask)
-    for start_y, start_x in zip(ys.tolist(), xs.tolist()):
-        if visited[start_y, start_x]:
-            continue
 
-        queue: deque[tuple[int, int]] = deque([(start_y, start_x)])
-        visited[start_y, start_x] = True
-        area = 0
-        min_x = max_x = start_x
-        min_y = max_y = start_y
-        sum_x = 0.0
-        sum_y = 0.0
-        max_score = 0.0
+def max_window_sum_bbox(
+    values: np.ndarray, window_height: int, window_width: int
+) -> tuple[float, tuple[int, int, int, int]]:
+    height, width = values.shape
+    if height < window_height or width < window_width:
+        return float(values.sum()), (0, 0, width, height)
 
-        while queue:
-            y, x = queue.popleft()
-            area += 1
-            sum_x += x
-            sum_y += y
-            max_score = max(max_score, float(scores[y, x]))
-            min_x = min(min_x, x)
-            max_x = max(max_x, x)
-            min_y = min(min_y, y)
-            max_y = max(max_y, y)
-
-            for dy, dx in neighbors:
-                ny = y + dy
-                nx = x + dx
-                if ny < 0 or ny >= height or nx < 0 or nx >= width:
-                    continue
-                if visited[ny, nx] or not mask[ny, nx]:
-                    continue
-                visited[ny, nx] = True
-                queue.append((ny, nx))
-
-        components.append(
-            Component(
-                area=area,
-                bbox=(min_x, min_y, max_x + 1, max_y + 1),
-                centroid=(sum_x / area, sum_y / area),
-                max_score=max_score,
-            )
-        )
-
-    return components
+    integral = np.pad(values, ((1, 0), (1, 0)), mode="constant").cumsum(0).cumsum(1)
+    sums = (
+        integral[window_height:, window_width:]
+        - integral[:-window_height, window_width:]
+        - integral[window_height:, :-window_width]
+        + integral[:-window_height, :-window_width]
+    )
+    top, left = np.unravel_index(np.argmax(sums), sums.shape)
+    return float(sums[top, left]), (
+        left,
+        top,
+        left + window_width,
+        top + window_height,
+    )
 
 
 def detect_plate_bbox(gray: np.ndarray) -> tuple[int, int, int, int]:
@@ -181,7 +159,7 @@ def detect_chambers(
 
     min_width = max(20, int(width * 0.03))
     chamber_runs = [run for run in column_runs if run[1] - run[0] >= min_width]
-    chambers: list[tuple[int, int, int, int]] = []
+    chamber_specs: list[tuple[int, int, int, int]] = []
 
     for start, end in chamber_runs:
         chamber_slice = plate[:, start:end]
@@ -192,15 +170,28 @@ def detect_chambers(
         except RuntimeError:
             continue
 
+        chamber_specs.append((start, end, chamber_y0, chamber_y1))
+
+    if not chamber_specs:
+        return []
+
+    # Chambers in a plate share a common vertical extent. Using the median
+    # top/bottom avoids one-off truncation when a single chamber profile is
+    # interrupted by a fly near the edge or uneven illumination.
+    common_y0 = int(round(np.median([spec[2] for spec in chamber_specs])))
+    common_y1 = int(round(np.median([spec[3] for spec in chamber_specs])))
+    pad_y = max(4, int((common_y1 - common_y0) * 0.02))
+
+    chambers: list[tuple[int, int, int, int]] = []
+    for start, end, _, _ in chamber_specs:
         pad_x = max(4, int((end - start) * 0.05))
-        pad_y = max(4, int((chamber_y1 - chamber_y0) * 0.02))
         chambers.append(
             clamp_bbox(
                 (
                     x0 + start - pad_x,
-                    y0 + chamber_y0 - pad_y,
+                    y0 + common_y0 - pad_y,
                     x0 + end + pad_x,
-                    y0 + chamber_y1 + pad_y,
+                    y0 + common_y1 + pad_y,
                 ),
                 gray.shape[1],
                 gray.shape[0],
@@ -211,54 +202,53 @@ def detect_chambers(
 
 
 def detect_fly_component(chamber_gray: np.ndarray) -> Component | None:
-    chamber_uint8 = np.clip(chamber_gray, 0, 255).astype(np.uint8)
+    chamber_height, chamber_width = chamber_gray.shape
+    scaled_width = max(8, chamber_width // 2)
+    scaled_height = max(8, chamber_height // 2)
+    scaled = resize_grayscale(chamber_gray, (scaled_width, scaled_height))
+
+    # Downsampling suppresses the chamber mesh, then the local darkness response
+    # asks whether there is a fly-sized cluster of dark pixels anywhere inside.
     blurred = np.asarray(
-        Image.fromarray(chamber_uint8).filter(ImageFilter.GaussianBlur(radius=6)),
+        Image.fromarray(np.clip(scaled, 0, 255).astype(np.uint8)).filter(
+            ImageFilter.GaussianBlur(radius=6)
+        ),
         dtype=np.float32,
     )
-    chamber_float = chamber_gray.astype(np.float32)
-    darkness = blurred - chamber_float
+    darkness = np.maximum(0.0, blurred - scaled)
 
-    border = max(6, int(min(chamber_gray.shape) * 0.05))
-    if border * 2 < chamber_gray.shape[0] and border * 2 < chamber_gray.shape[1]:
-        inner = darkness[border:-border, border:-border]
-    else:
-        inner = darkness
+    border = 1
+    inner = darkness[border:-border, border:-border]
+    threshold = max(3.0, float(np.mean(inner) + 1.25 * np.std(inner)))
+    response = np.maximum(0.0, darkness - threshold)
+    response[:border, :] = 0.0
+    response[-border:, :] = 0.0
+    response[:, :border] = 0.0
+    response[:, -border:] = 0.0
 
-    threshold = max(16.0, float(np.mean(inner) + 3.0 * np.std(inner)))
-    mask = darkness > threshold
-    if border > 0:
-        mask[:border, :] = False
-        mask[-border:, :] = False
-        mask[:, :border] = False
-        mask[:, -border:] = False
-
-    components = connected_components(mask, darkness)
-    if not components:
+    score, bbox_small = max_window_sum_bbox(response, window_height=16, window_width=10)
+    if score < 1227.0:
         return None
 
-    best: Component | None = None
-    best_score = -math.inf
-    for component in components:
-        x0, y0, x1, y1 = component.bbox
-        comp_width = x1 - x0
-        comp_height = y1 - y0
-        if component.area < 25 or component.area > 2500:
-            continue
-        if comp_width < 4 or comp_height < 4:
-            continue
-        if component.max_score < 35.0:
-            continue
-
-        aspect = max(comp_width, comp_height) / max(1, min(comp_width, comp_height))
-        score = component.max_score + math.log(component.area)
-        if aspect > 12:
-            score -= 8.0
-        if best is None or score > best_score:
-            best = component
-            best_score = score
-
-    return best
+    scale_x = chamber_width / float(scaled_width)
+    scale_y = chamber_height / float(scaled_height)
+    sx0, sy0, sx1, sy1 = bbox_small
+    bbox = (
+        max(0, int(math.floor(sx0 * scale_x))),
+        max(0, int(math.floor(sy0 * scale_y))),
+        min(chamber_width, int(math.ceil(sx1 * scale_x))),
+        min(chamber_height, int(math.ceil(sy1 * scale_y))),
+    )
+    centroid = (
+        0.5 * (bbox[0] + bbox[2]),
+        0.5 * (bbox[1] + bbox[3]),
+    )
+    return Component(
+        area=max(1, (bbox[2] - bbox[0]) * (bbox[3] - bbox[1])),
+        bbox=bbox,
+        centroid=centroid,
+        max_score=score,
+    )
 
 
 def classify_chambers(
@@ -313,21 +303,19 @@ def draw_debug(
     image.save(output_path)
 
 
-def crop_chamber_video(
+def crop_video_region(
     video_path: Path,
     output_path: Path,
     bbox: tuple[int, int, int, int],
-    frame_width: int,
-    frame_height: int,
-    padding: int,
     force: bool,
 ) -> None:
     if output_path.exists() and not force:
         return
 
-    x0, y0, x1, y1 = expand_bbox(bbox, padding, frame_width, frame_height)
+    x0, y0, x1, y1 = bbox
     width = x1 - x0
     height = y1 - y0
+    output_path.parent.mkdir(parents=True, exist_ok=True)
     cmd = [
         "ffmpeg",
         "-y" if force else "-n",
@@ -349,6 +337,13 @@ def crop_chamber_video(
     )
 
 
+def chamber_record_from_manifest(manifest: dict, chamber_index: int) -> dict:
+    for chamber in manifest.get("chambers", []):
+        if int(chamber.get("index", -1)) == chamber_index:
+            return chamber
+    raise ValueError(f"Could not find chamber {chamber_index:02d} in detections manifest.")
+
+
 def get_param(name, default=None):
     try:
         return getattr(snakemake.params, name)  # noqa: F821
@@ -358,28 +353,40 @@ def get_param(name, default=None):
 
 def main():
     video_path = Path(str(snakemake.input.video)).resolve()  # noqa: F821
-    output_dir = Path(str(snakemake.output[0])).resolve()  # noqa: F821
-
-    if output_dir.parent != video_path.parent:
-        raise ValueError(
-            f"Expected output dir next to input video. Got {output_dir} for {video_path}."
-        )
-
-    stem = video_path.stem
-    if not output_dir.name.startswith(stem):
-        raise ValueError(
-            f"Output dir {output_dir.name} must start with the input stem {stem}."
-        )
-
-    output_suffix = output_dir.name[len(stem) :]
-    if not output_suffix:
-        raise ValueError(f"Could not infer output suffix from {output_dir}.")
-
+    mode = str(get_param("mode", "detect"))
     min_chambers = int(get_param("min_chambers", 6))
     crop_padding = int(get_param("crop_padding", 10))
     detection_padding = int(get_param("detection_padding", 18))
     force = bool(get_param("force", False))
     skip_cropping = bool(get_param("skip_cropping", False))
+
+    if mode == "crop":
+        manifest_path = Path(str(snakemake.input.manifest)).resolve()  # noqa: F821
+        output_video = Path(str(snakemake.output[0])).resolve()  # noqa: F821
+        chamber_index = int(str(snakemake.wildcards.chamber))  # noqa: F821
+
+        with manifest_path.open() as handle:
+            manifest = json.load(handle)
+
+        chamber = chamber_record_from_manifest(manifest, chamber_index)
+        if not chamber.get("has_fly"):
+            raise ValueError(f"Chamber {chamber_index:02d} is not fly-positive in {manifest_path}.")
+
+        crop_bbox = tuple(int(value) for value in chamber["crop_bbox_xyxy"])
+        crop_video_region(video_path, output_video, crop_bbox, force=force)
+        return
+
+    if mode != "detect":
+        raise ValueError(f"Unsupported split_videos mode: {mode}")
+
+    manifest_path = Path(str(snakemake.output.manifest)).resolve()  # noqa: F821
+    debug_path = Path(str(snakemake.output.detections_png)).resolve()  # noqa: F821
+    output_dir = manifest_path.parent
+
+    if output_dir.parent != video_path.parent:
+        raise ValueError(
+            f"Expected output dir next to input video. Got {output_dir} for {video_path}."
+        )
 
     frame_rgb = read_first_frame(video_path)
     frame_height, frame_width = frame_rgb.shape[:2]
@@ -405,13 +412,12 @@ def main():
     }
 
     for detection in detections:
+        crop_bbox = expand_bbox(detection.bbox, crop_padding, frame_width, frame_height)
         chamber_record = {
             "index": detection.index,
             "bbox_xyxy": list(detection.bbox),
             "detection_bbox_xyxy": list(detection.detection_bbox),
-            "crop_bbox_xyxy": list(
-                expand_bbox(detection.bbox, crop_padding, frame_width, frame_height)
-            ),
+            "crop_bbox_xyxy": list(crop_bbox),
             "has_fly": detection.has_fly,
         }
         if detection.fly_component is not None:
@@ -427,18 +433,9 @@ def main():
             output_video = (
                 output_dir / f"{video_path.stem}_chamber{detection.index:02d}.mp4"
             )
-            crop_chamber_video(
-                video_path,
-                output_video,
-                detection.bbox,
-                frame_width,
-                frame_height,
-                crop_padding,
-                force=force,
-            )
+            crop_video_region(video_path, output_video, crop_bbox, force=force)
 
-    debug_path = output_dir / f"{video_path.stem}_detections.png"
-    manifest_path = output_dir / f"{video_path.stem}_detections.json"
+    output_dir.mkdir(parents=True, exist_ok=True)
     draw_debug(frame_rgb, plate_bbox, detections, debug_path)
     manifest_path.write_text(json.dumps(manifest, indent=2))
 

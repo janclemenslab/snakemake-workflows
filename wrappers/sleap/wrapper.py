@@ -65,6 +65,10 @@ def main():
 
     extra = [f"--model_paths {model} " for model in models]
 
+    # only add "tracking" if not a single instance model
+    if "single_instance" not in models[0]:
+        extra.append("--tracking ")
+
     # normalize params from old analysis files - TODO: update workflow spec and old analysis files
     print("Normalizing params")
     for key, value in params.items():
@@ -104,7 +108,7 @@ def main():
     for out in snakemake.output:
         print(f"Creating {out}")
         os.makedirs(os.path.dirname(out), exist_ok=True)
-        cmd = f"export PYTHONIOENCODING=utf-8; sleap track --data_path {snakemake.input.video} --frames 0-{nb_frames_corrected} --output_path {out}.slp --tracking {extra}"
+        cmd = f"export PYTHONIOENCODING=utf-8; sleap track --data_path {snakemake.input.video} --frames 0-{nb_frames_corrected} --output_path {out}.slp {extra}"
         print(cmd)
         os.system(cmd)
         cmd = f"export PYTHONIOENCODING=utf-8; sleap export {out}.slp -o {out}"
