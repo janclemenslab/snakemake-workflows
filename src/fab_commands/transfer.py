@@ -424,3 +424,7 @@ def main(argv=None):
     else:
         parser.error(f"Unknown command: {args.command}")
     return 0
+
+
+if __name__ == "__main__":
+    main()
