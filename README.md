@@ -50,7 +50,7 @@ umask a=rwx
 module load Miniforge3
 conda create --prefix "/fs/s6k/groups/agauneu/#Data/snakemake-workflows/.envs/ncb" python=3.14 git uv ffmpeg
 conda activate "/fs/s6k/groups/agauneu/#Data/snakemake-workflows/.envs/ncb"
-uv pip install snakemake fabric rich pyyaml snakemake-executor-plugin-slurm
+uv pip install snakemake fabric rich pyyaml snakemake-executor-plugin-slurm h5py matplotlib av
 uv pip install -e /fs/s6k/groups/agauneu/#Data/snakemake-workflows
 ```
 
