@@ -17,7 +17,7 @@ from fabric import Connection
 logger = logging.getLogger(__name__)
 
 HOME_TRANSFER_DIR = Path.home() / "data.transfer"
-FIXDAQ_PATTERN = "dat/**/*daq.zarr"
+FIXDAQ_PATTERN = "**/*daq.zarr"
 DEFAULT_RIG_NAME = "chainingmic"
 DEFAULT_PERMISSION_HOST = "rosa.hpc.uni-oldenburg.de"
 DEFAULT_REMOTE_DATA_ROOT = PurePosixPath("/fs/s6k/groups/agauneu/#Data")
