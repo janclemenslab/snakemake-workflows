@@ -214,29 +214,13 @@ def dashboard(
         f"FAB_MONITOR_USER={user}",
         f"FAB_MONITOR_REMOTE_HOST={effective_remote_host}",
         f"FAB_MONITOR_LIMIT={limit}",
-        "marimo",
-        "run",
+        f"FAB_MONITOR_BIND_HOST={bind_host}",
+        f"FAB_MONITOR_PORT={port}",
+        "python",
         str(dashboard_app),
-        "--host",
-        str(bind_host),
-        "--port",
-        str(port),
     ]
     if headless:
-        command.append("--headless")
-    command.extend(
-        [
-            "--",
-            "--project-dir",
-            str(project_dir),
-            "--limit",
-            str(limit),
-        ]
-    )
-    if user:
-        command.extend(["--user", user])
-    if effective_remote_host:
-        command.extend(["--remote-host", effective_remote_host])
+        logging.info("FastHTML dashboard runs headless by default; ignoring headless=%s", headless)
 
     c.run(" ".join(shlex.quote(part) for part in command))
 

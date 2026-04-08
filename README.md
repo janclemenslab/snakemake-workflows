@@ -22,7 +22,7 @@ uv pip install git+https://github.com/janclemenslab/snakemake-workflows
 - annotate if necessary: `fab annotate`
 - submit jobs: `fab submit --user abcd1234`
 - monitor the latest controller run in a compact summary: `fab monitor --user abcd1234`
-- open a local marimo dashboard for the latest controller run: `fab dashboard --user abcd1234`
+- open a local FastHTML dashboard for the latest controller run: `fab dashboard --user abcd1234`
 - check status of tracker jobs: `fab queue --user abcd1234`
 
 ### Transfer from Windows
