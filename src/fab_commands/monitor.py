@@ -345,6 +345,12 @@ def job_rows(run: ControllerRun, *, limit: int = 0) -> list[dict[str, str]]:
         if job.slurm_state:
             state = f"{state}/{job.slurm_state}"
         log_value = job.log or job.slurm_log or "-"
+        display_log = log_value.split(",")[0].strip() if log_value != "-" else "-"
+        display_log = re.sub(
+            r"\s*\(check log file\(s\) for error details\)\s*$",
+            "",
+            display_log,
+        )
         rows.append(
             {
                 "smk_jobid": job.snakemake_id,
@@ -357,7 +363,7 @@ def job_rows(run: ControllerRun, *, limit: int = 0) -> list[dict[str, str]]:
                 "input": job.input or "-",
                 "output": job.output or "-",
                 "log": log_value,
-                "log_file": log_value.split(",")[0].strip() if log_value != "-" else "-",
+                "log_file": display_log,
             }
         )
     return rows

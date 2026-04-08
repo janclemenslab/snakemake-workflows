@@ -195,7 +195,7 @@ def _controls(controller_log: str, user: str, remote_host: str, limit: int, refr
                     ),
                     cls="flex items-end h-full",
                 ),
-                cols=1,
+                cols_min=1,
                 cols_md=2,
                 cols_lg=3,
                 cols_xl=6,
@@ -236,14 +236,15 @@ def _summary(run, queue_warning: str):
         _stats_card("Failed", counts["failed"]),
     ]
 
-    blocks = [Grid(*items, cols=1, cols_md=2, cols_lg=3, cols_xl=5, cls="gap-3")]  # noqa: F405
+    blocks = [Grid(*items, cols_min=1, cols_md=2, cols_lg=3, cols_xl=5, cls="gap-3")]  # noqa: F405
     warnings = []
     if queue_warning:
         warnings.append(_warning_card("Live Queue", [queue_warning], "warn"))
-    if run.errors:
-        warnings.append(_warning_card("Recent Errors", run.errors[-5:], "danger"))
+    error_messages = [message for message in run.errors if message and message != "None"]
+    if error_messages:
+        warnings.append(_warning_card("Recent Errors", error_messages[-5:], "danger"))
     if warnings:
-        blocks.append(Grid(*warnings, cols=1, cols_lg=2, cls="gap-3"))  # noqa: F405
+        blocks.append(Grid(*warnings, cols_min=1, cols_lg=2, cls="gap-3"))  # noqa: F405
     return Div(*blocks, cls="space-y-3")  # noqa: F405
 
 
@@ -433,7 +434,7 @@ def job_modal(
         *log_cards,
         header=header,
         footer=Div(
-            ModalCloseButton("Close", cls=(ButtonT.secondary, "static")),  # noqa: F405
+            ModalCloseButton("Close", cls=(ButtonT.secondary, "static"), submit=False),  # noqa: F405
             cls="flex justify-end",
         ),
         id="job-log-modal",
