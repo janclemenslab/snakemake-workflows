@@ -5,9 +5,11 @@ channels:
   - ncb
 dependencies:
   - python=3.9
-  - numpy
+  - numpy<2
   - pandas
   - scipy
+  - h5py
+  - pytables
   - pip
   - pip:
       - xarray_behave

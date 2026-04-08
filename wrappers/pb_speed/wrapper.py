@@ -1,7 +1,5 @@
 """Compute stimulus-aligned speed traces from merged SLEAP tracks."""
 
-from __future__ import annotations
-
 import ast
 import datetime as dt
 import json
@@ -15,7 +13,6 @@ import numpy as np
 import pandas as pd
 import scipy.ndimage
 import scipy.signal
-import xarray_behave as xb
 
 
 TRACK_SUFFIX = "_sleap.h5"
@@ -66,7 +63,9 @@ def infer_root(track_path: Path) -> Path:
 
 def infer_context(track_path: Path) -> tuple[Path, str, str, Path]:
     if not track_path.name.endswith(TRACK_SUFFIX):
-        raise ValueError(f"Expected a merged SLEAP track file ending in {TRACK_SUFFIX}: {track_path}")
+        raise ValueError(
+            f"Expected a merged SLEAP track file ending in {TRACK_SUFFIX}: {track_path}"
+        )
 
     root = infer_root(track_path)
     session = track_path.parent.name
@@ -89,6 +88,8 @@ def assemble_dataset(
     target_sampling_rate: int,
     resample_video_data: bool,
 ):
+    import xarray_behave as xb
+
     return xb.assemble(
         datename=session,
         root=str(root),
@@ -100,6 +101,8 @@ def assemble_dataset(
 
 
 def compute_speed(ds, median_kernel: int) -> np.ndarray:
+    import xarray_behave as xb
+
     positions = np.nanmean(np.asarray(ds.pose_positions_allo), axis=-2)
     velocity = np.asarray(xb.metrics.velocity(positions))
     speed_raw = np.linalg.norm(velocity, axis=-1)
@@ -200,6 +203,13 @@ def dataframe_to_npz_kwargs(frame: pd.DataFrame) -> dict[str, np.ndarray]:
     return kwargs
 
 
+# import snakemake
+# session = "localhost-20260408_094901"
+# video = "localhost-20260408_094901_2"
+# track_path = Path(f"res/{session}/{video}_sleap.h5")
+# output_path = Path(f"res/{session}/{video}_spd.npz")
+
+
 def main():
     track_path = Path(str(snakemake.input.tracks)).resolve()  # noqa: F821
     output_path = Path(str(snakemake.output.speed)).resolve()  # noqa: F821
@@ -231,7 +241,9 @@ def main():
     prefix = int(round(float(params["prefix_seconds"]) * fs))
     duration = int(round(float(params["duration_seconds"]) * fs))
     time_axis = np.asarray(ds.time, dtype=float)
-    traces = extract_aligned_traces(speed, time_axis, onset_times, prefix=prefix, duration=duration)
+    traces = extract_aligned_traces(
+        speed, time_axis, onset_times, prefix=prefix, duration=duration
+    )
     rel_time = np.arange(-prefix, duration, dtype=float) / fs
 
     print(f"Detected {len(onset_times)} stimulus events.")
@@ -242,7 +254,9 @@ def main():
         logs = parse_log_file(log_path).reset_index(drop=True)
         metadata = metadata.join(logs.reindex(metadata.index))
     else:
-        print(f"DAQ log not found, saving speed traces without log metadata: {log_path}")
+        print(
+            f"DAQ log not found, saving speed traces without log metadata: {log_path}"
+        )
 
     metadata["onset_times"] = onset_times
     metadata["offset_times"] = offset_times

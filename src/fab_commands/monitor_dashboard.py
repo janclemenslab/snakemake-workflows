@@ -13,7 +13,6 @@ def _():
     from pathlib import Path
 
     import marimo as mo
-    import pandas as pd
 
     from fab_commands.monitor import (
         apply_squeue_state,
@@ -21,6 +20,8 @@ def _():
         fetch_squeue_output,
         job_rows,
         parse_controller_log,
+        read_log_tail,
+        resolve_log_paths,
     )
 
     return (
@@ -33,7 +34,8 @@ def _():
         mo,
         os,
         parse_controller_log,
-        pd,
+        read_log_tail,
+        resolve_log_paths,
     )
 
 
@@ -72,53 +74,70 @@ def _(default_host, default_limit, default_log, default_user, mo, options, proje
     controller_log = mo.ui.dropdown(
         options,
         value=default_log,
-        label="Controller log",
-        full_width=True,
+        label="Run",
     )
     user = mo.ui.text(
         value=default_user,
-        label="SLURM user",
+        label="User",
         placeholder="abcd1234",
-        full_width=True,
     )
     remote_host = mo.ui.text(
         value=default_host,
-        label="SSH host",
+        label="Host",
         placeholder="rosa.hpc.uni-oldenburg.de",
-        full_width=True,
     )
     limit = mo.ui.slider(
         5,
-        100,
+        50,
         step=5,
-        value=min(default_limit, 100),
-        label="Visible jobs",
+        value=min(default_limit, 50),
+        label="Rows",
         show_value=True,
     )
-    refresh = mo.ui.run_button(label="Refresh now")
-    header = mo.md(
-        f"""
-        # Snakemake dashboard
-
-        **Workflow:** `{project_dir.name}`  
-        **Project dir:** `{project_dir}`
-        """
+    refresh = mo.ui.run_button(label="Refresh")
+    header = mo.md(f"## `{project_dir.name}`")
+    advanced = mo.accordion(
+        {
+            "Options": mo.hstack(
+                [user, remote_host, limit],
+                justify="start",
+                align="end",
+                widths=[1, 2, 1],
+            )
+        }
     )
-    controls = mo.vstack(
+    controls_row = mo.hstack(
         [
             header,
-            mo.hstack([controller_log, user, remote_host], align="end", widths=[3, 1, 2]),
-            mo.hstack([limit, refresh], justify="start", align="center", widths=[3, 1]),
+            controller_log,
+            refresh,
+            advanced,
         ],
-        gap=1,
+        align="end",
+        justify="start",
+        widths=[1, 2, 1, 2],
     )
-    controls
+    controls_row
     return controller_log, limit, refresh, remote_host, user
+
+
+@app.cell
+def _(mo):
+    get_selected_details, set_selected_details = mo.state(None)
+    return get_selected_details, set_selected_details
+
+
+@app.cell
+def _(controller_log, set_selected_details):
+    controller_log.value
+    set_selected_details(None)
+    return
 
 
 @app.cell
 def _(
     apply_squeue_state,
+    Path,
     controller_log,
     fetch_squeue_output,
     parse_controller_log,
@@ -161,16 +180,20 @@ def _(mo, queue_warning, run):
         if run.progress_total:
             progress = f"{run.progress_done}/{run.progress_total} ({run.progress_percent}%)"
 
-        summary = mo.md(
-            f"""
-            ## Summary
-
-            **State:** `{run.state}`  
-            **Started:** `{run.started_at}`  
-            **Progress:** `{progress}`  
-            **Last event:** `{run.status_line}`  
-            **Counts:** `running={counts["running"]}` `pending={counts["submitted"] - counts["running"]}` `finished={counts["finished"]}` `failed={counts["failed"]}` `local={counts["local"]}`
-            """
+        summary = mo.hstack(
+            [
+                mo.stat(run.state, label="State", caption=run.started_at, bordered=True),
+                mo.stat(progress, label="Progress", caption=run.status_line, bordered=True),
+                mo.stat(counts["running"], label="Running", bordered=True),
+                mo.stat(
+                    counts["submitted"] - counts["running"],
+                    label="Pending",
+                    bordered=True,
+                ),
+                mo.stat(counts["failed"], label="Failed", bordered=True),
+            ],
+            gap=1,
+            widths="equal",
         )
 
         warnings = []
@@ -187,60 +210,143 @@ def _(mo, queue_warning, run):
 
 
 @app.cell
-def _(job_rows, limit, mo, pd, run):
+def _(job_rows, limit, mo, run, set_selected_details):
     if run is None:
-        jobs_table = None
-        jobs_content = mo.md("")
+        jobs_panel = mo.md("")
     else:
         rows = job_rows(run, limit=limit.value)
-        frame = pd.DataFrame(rows)
-        if frame.empty:
-            jobs_table = None
-            jobs_content = mo.callout(
+        if not rows:
+            jobs_panel = mo.callout(
                 "No jobs were parsed from the selected controller log.",
                 kind="info",
             )
         else:
-            jobs_table = mo.ui.table(
-                frame,
-                page_size=min(limit.value, 20),
-                selection="single",
-                wrapped_columns=["wildcards", "node_or_reason", "log"],
-                label="Jobs",
-            )
-            jobs_content = jobs_table
+            def make_open_button(payload):
+                def _open(_value):
+                    set_selected_details(payload)
+                    return payload["smk_jobid"]
 
-    jobs_content
-    return (jobs_table,)
+                return mo.ui.button(
+                    label="View",
+                    value=None,
+                    on_click=_open,
+                    tooltip="Open logs in the viewer",
+                )
+
+            visible = []
+            for row in rows:
+                visible.append(
+                    {
+                        "open": make_open_button(row),
+                        "smk_jobid": row["smk_jobid"],
+                        "state": row["state"],
+                        "rule": row["rule"],
+                        "wildcards": row["wildcards"],
+                        "elapsed": row["elapsed"],
+                        "node_or_reason": row["node_or_reason"],
+                        "log_file": row["log_file"],
+                    }
+                )
+
+            jobs_table = mo.ui.table(
+                visible,
+                page_size=min(limit.value, 20),
+                freeze_columns_left=["open", "rule"],
+                wrapped_columns=["wildcards", "node_or_reason", "log_file"],
+                header_tooltip={
+                    "open": "Open logs in the viewer without leaving the dashboard",
+                },
+                label="Jobs",
+                max_height=760,
+            )
+            jobs_panel = mo.vstack([mo.md("### Jobs"), jobs_table], gap=1)
+
+    return (jobs_panel,)
 
 
 @app.cell
-def _(jobs_table, mo):
-    selected_row = None
-    if jobs_table is not None and jobs_table.value:
-        selected_row = jobs_table.value
-        if isinstance(selected_row, list):
-            selected_row = selected_row[0] if selected_row else None
+def _(
+    Path,
+    get_selected_details,
+    mo,
+    project_dir,
+    read_log_tail,
+    resolve_log_paths,
+    set_selected_details,
+):
+    selected_details = get_selected_details()
 
-    if selected_row is None:
-        details = mo.md("")
+    def close_viewer(_value):
+        set_selected_details(None)
+        return None
+
+    if selected_details is None:
+        details_panel = mo.vstack(
+            [
+                mo.md("### Log Viewer"),
+                mo.callout("Use `View` in the jobs table to inspect logs here.", kind="info"),
+            ],
+            gap=1,
+        )
     else:
-        details = mo.md(
-            f"""
-            ## Selected job
+        log_paths = resolve_log_paths(project_dir, selected_details["log"])
+        tabs = {}
+        for path in log_paths:
+            tabs[path.name] = mo.vstack(
+                [
+                    mo.plain_text(str(path)),
+                    mo.ui.code_editor(
+                        value=read_log_tail(Path(path)),
+                        language="shell",
+                        disabled=True,
+                        min_height=420,
+                        max_height=720,
+                        show_copy_button=True,
+                    ),
+                ],
+                gap=1,
+            )
 
-            **Rule:** `{selected_row["rule"]}`  
-            **Snakemake job:** `{selected_row["smk_jobid"]}`  
-            **SLURM job:** `{selected_row["slurm_jobid"]}`  
-            **State:** `{selected_row["state"]}`  
-            **Wildcards:** `{selected_row["wildcards"]}`  
-            **Input:** `{selected_row["input"]}`  
-            **Output:** `{selected_row["output"]}`  
-            **Log:** `{selected_row["log"]}`
-            """
+        details_panel = mo.vstack(
+            [
+                mo.hstack(
+                    [
+                        mo.md(f"### {selected_details['rule']}"),
+                        mo.ui.button(
+                            label="Close",
+                            value=None,
+                            on_click=close_viewer,
+                            tooltip="Hide the log viewer",
+                        ),
+                    ],
+                    justify="space-between",
+                    align="center",
+                    widths=[4, 1],
+                ),
+                mo.md(
+                    f"""
+                    `{selected_details["state"]}`  
+                    `SMK {selected_details["smk_jobid"]}` `SLURM {selected_details["slurm_jobid"]}`
+                    """
+                ),
+                mo.plain_text(selected_details["wildcards"]),
+                mo.tabs(tabs) if tabs else mo.callout("No readable log files for this job.", kind="warn"),
+            ],
+            gap=1,
         )
 
-    details
+    return (details_panel,)
+
+
+@app.cell
+def _(details_panel, jobs_panel, mo):
+    layout = mo.hstack(
+        [jobs_panel, details_panel],
+        widths=[3, 2],
+        align="start",
+        gap=1,
+    )
+    layout
     return
 
 

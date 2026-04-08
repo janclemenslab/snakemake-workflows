@@ -344,6 +344,7 @@ def job_rows(run: ControllerRun, *, limit: int = 0) -> list[dict[str, str]]:
         state = job.status
         if job.slurm_state:
             state = f"{state}/{job.slurm_state}"
+        log_value = job.log or job.slurm_log or "-"
         rows.append(
             {
                 "smk_jobid": job.snakemake_id,
@@ -355,10 +356,48 @@ def job_rows(run: ControllerRun, *, limit: int = 0) -> list[dict[str, str]]:
                 "node_or_reason": job.node or job.reason or "-",
                 "input": job.input or "-",
                 "output": job.output or "-",
-                "log": job.log or job.slurm_log or "-",
+                "log": log_value,
+                "log_file": log_value.split(",")[0].strip() if log_value != "-" else "-",
             }
         )
     return rows
+
+
+def resolve_log_paths(project_dir: Path, log_value: str) -> list[Path]:
+    if not log_value or log_value == "-":
+        return []
+
+    paths: list[Path] = []
+    for raw_part in log_value.split(","):
+        cleaned = raw_part.strip()
+        cleaned = re.sub(r"\s*\(check log file\(s\) for error details\)\s*$", "", cleaned)
+        if not cleaned:
+            continue
+        path = Path(cleaned)
+        if not path.is_absolute():
+            path = project_dir / path
+        paths.append(path)
+    return paths
+
+
+def read_log_tail(path: Path, *, max_lines: int = 300, max_chars: int = 50000) -> str:
+    if not path.exists():
+        return f"{path}\n\nFile not found."
+
+    try:
+        lines = path.read_text(errors="replace").splitlines()
+    except Exception as exc:  # pragma: no cover - best effort viewer
+        return f"{path}\n\nUnable to read file: {exc}"
+
+    tail = "\n".join(lines[-max_lines:])
+    if len(tail) > max_chars:
+        tail = tail[-max_chars:]
+    header = f"# {path}\n"
+    if len(lines) > max_lines:
+        header += f"# Showing last {max_lines} of {len(lines)} lines.\n\n"
+    else:
+        header += "\n"
+    return header + tail
 
 
 def render_monitor(run: ControllerRun, *, workflow_name: str, limit: int = 20) -> None:

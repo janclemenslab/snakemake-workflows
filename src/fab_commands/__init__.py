@@ -1,15 +1,12 @@
 """Global fab commands compatible with Fabric 3.x."""
 
 import glob
-import logging
 import os
 from pathlib import Path
 import shlex
 from fabric import Connection, task
 
 from .monitor import apply_squeue_state, latest_controller_log, parse_controller_log, render_monitor
-
-logging.basicConfig(level=logging.INFO)
 
 
 NAME = os.path.basename(os.getcwd())
