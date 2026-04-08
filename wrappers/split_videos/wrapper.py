@@ -1,6 +1,8 @@
 import json
 import math
+import shutil
 import subprocess
+import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable
@@ -130,16 +132,15 @@ def detect_plate_bbox(gray: np.ndarray) -> tuple[int, int, int, int]:
     row_threshold = threshold_from_profile(row_profile, 0.55)
     y0, y1 = largest_run(row_profile > row_threshold)
 
-    # Some plates taper into a dimmer lower section. Keep the stable top edge
-    # from the stricter threshold, then extend only the bottom using the
-    # overlapping run from a more permissive threshold.
-    bottom_threshold = threshold_from_profile(row_profile, 0.4)
-    bottom_runs = find_runs(row_profile > bottom_threshold)
-    overlapping_bottom_runs = [
-        run for run in bottom_runs if run[0] < y1 and run[1] > y0
-    ]
-    if overlapping_bottom_runs:
-        y1 = max(run[1] for run in overlapping_bottom_runs)
+    # Some plates taper into dimmer top/bottom sections. Start from the stable
+    # core run, then expand to the overlapping run from a more permissive
+    # threshold so chamber tips are not clipped.
+    expand_threshold = threshold_from_profile(row_profile, 0.4)
+    expand_runs = find_runs(row_profile > expand_threshold)
+    overlapping_expand_runs = [run for run in expand_runs if run[0] < y1 and run[1] > y0]
+    if overlapping_expand_runs:
+        y0 = min(run[0] for run in overlapping_expand_runs)
+        y1 = max(run[1] for run in overlapping_expand_runs)
 
     cropped = gray[y0:y1, :]
     col_profile = moving_average(cropped.mean(axis=0), 201)
@@ -241,7 +242,7 @@ def detect_fly_component(chamber_gray: np.ndarray) -> Component | None:
 
     score, bbox_small = max_window_sum_bbox(response, window_height=16, window_width=10)
     score_ratio = score / max(threshold, 1e-6)
-    if score < 1000.0 or score_ratio < 75.0:
+    if score < 900.0 or score_ratio < 75.0:
         return None
 
     scale_x = chamber_width / float(scaled_width)
@@ -330,6 +331,8 @@ def crop_video_region(
     width = x1 - x0
     height = y1 - y0
     output_path.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.NamedTemporaryFile(suffix=output_path.suffix, delete=False) as handle:
+        temp_output = Path(handle.name)
     cmd = [
         "ffmpeg",
         "-y" if force else "-n",
@@ -344,11 +347,18 @@ def crop_video_region(
         "18",
         "-preset",
         "fast",
-        str(output_path),
+        str(temp_output),
     ]
-    subprocess.run(
-        cmd, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
-    )
+    try:
+        subprocess.run(
+            cmd, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+        )
+        if force and output_path.exists():
+            output_path.unlink()
+        shutil.move(str(temp_output), str(output_path))
+    finally:
+        if temp_output.exists():
+            temp_output.unlink()
 
 
 def chamber_record_from_manifest(manifest: dict, chamber_index: int) -> dict:

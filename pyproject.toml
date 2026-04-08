@@ -11,12 +11,15 @@ requires-python = ">=3.13"
 dependencies = [
     "snakemake",
     "fabric",
+    "marimo",
     "rich",
     "pyyaml",
     "uv",
     "numpy",
     "h5py",
     "zarr",
+    "xarray-behave",
+    "pandas",
     "snakemake-executor-plugin-slurm",
     "etho_annotator@git+https://github.com/janclemenslab/etho_annotator",
 ]

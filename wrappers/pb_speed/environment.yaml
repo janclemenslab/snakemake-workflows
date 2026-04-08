@@ -1,0 +1,13 @@
+name: pb_speed
+channels:
+  - conda-forge
+  - anaconda
+  - ncb
+dependencies:
+  - python=3.9
+  - numpy
+  - pandas
+  - scipy
+  - pip
+  - pip:
+      - xarray_behave

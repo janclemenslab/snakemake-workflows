@@ -5,6 +5,7 @@ local-cores: 1
 rerun-incomplete: true
 keep-going: true
 # slurm_account: agauneu
+rerun-triggers: mtime
 notemp: true
 printshellcmds: false
 show-failed-logs: true

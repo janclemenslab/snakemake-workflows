@@ -21,6 +21,8 @@ uv pip install git+https://github.com/janclemenslab/snakemake-workflows
 - go to the folder for your experiments (chainigmic, backlight etc) - on windows: `cd W:/#Data/chainingmic`
 - annotate if necessary: `fab annotate`
 - submit jobs: `fab submit --user abcd1234`
+- monitor the latest controller run in a compact summary: `fab monitor --user abcd1234`
+- open a local marimo dashboard for the latest controller run: `fab dashboard --user abcd1234`
 - check status of tracker jobs: `fab queue --user abcd1234`
 
 ### Transfer from Windows
@@ -73,6 +75,7 @@ Each workflow contains:
 - [das](wrappers/das/README.md)
 - [split_videos](wrappers/split_videos/README.md)
 - [merge_splits](wrappers/merge_splits/README.md)
+- [pb_speed](wrappers/pb_speed/README.md)
 
 
 ## Analysis profiles
@@ -107,9 +110,9 @@ Can be accessed in the wrapper.py via: `params = snakemake.params[0]`. `params[s
 
 
 
-Will use `workflow/analysis_profiles/default.yaml` if that file does not exist. Note that the default schema needs to have an entry for each rule - otherwise the rule will not be run. Right now you have to create a "dummy" entry that starts with the rulename followed by a `.`. The following will run the `spd` rule is run. This is not great since this will create a check box in the annotator GUI, giving the illusion that this is - but the param value will be ignored and the `spd` irrespective of the state of this field.
+Will use `workflow/analysis_profiles/default.yaml` if that file does not exist. Note that the default schema needs to have an entry for each rule - otherwise the rule will not be run. Right now you have to create a "dummy" entry that starts with the rulename followed by a `.`. The following will run the `pb_speed` rule. This is not great since this will create a check box in the annotator GUI, giving the illusion that this is configurable, but the param value will be ignored and `pb_speed` will run irrespective of the state of this field.
 ```yaml
-- name: spd.
+- name: pb_speed.
   label: postprocess tracks (dummy option - will be run regardless of selection)
   type: bool
   default: True

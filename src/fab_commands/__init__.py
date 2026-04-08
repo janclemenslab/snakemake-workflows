@@ -3,8 +3,11 @@
 import glob
 import logging
 import os
+from pathlib import Path
 import shlex
 from fabric import Connection, task
+
+from .monitor import apply_squeue_state, latest_controller_log, parse_controller_log, render_monitor
 
 logging.basicConfig(level=logging.INFO)
 
@@ -13,6 +16,7 @@ NAME = os.path.basename(os.getcwd())
 REMOTE = ""
 SERVER = ""
 FOLDER = ""
+LOCAL_PROJECT_DIR = Path(os.getcwd()).resolve()
 
 WORKFLOW_PROFILE = "../snakemake-workflows/profiles/rosa"
 REMOTE_CONDA_ENV = "/fs/s6k/groups/agauneu/#Data/snakemake-workflows/.envs/ncb"
@@ -49,8 +53,15 @@ def update_globals(c=None, name=None):
         REMOTE = ""
 
 
-def configure_project(project_name):
+def configure_project(project_name, project_dir=None):
+    global LOCAL_PROJECT_DIR
     update_globals(name=project_name)
+    if project_dir is not None:
+        LOCAL_PROJECT_DIR = Path(project_dir).resolve()
+
+
+def _local_project_dir() -> Path:
+    return LOCAL_PROJECT_DIR
 
 
 def _snakemake_target_arg(target):
@@ -163,6 +174,76 @@ def status(c):
     c.run("sacct --format='JobID,JobName,Elapsed,MaxVMSize,MaxRSS,CPUTime,State'")
 
 
+def monitor(c, limit=20):
+    project_dir = _local_project_dir()
+    controller_log = latest_controller_log(project_dir)
+    if controller_log is None:
+        print("No controller logs found under log/slurm.")
+        return
+
+    run = parse_controller_log(controller_log)
+
+    try:
+        result = c.run(
+            f"squeue -h -u {_connection_user(c)} -o '%i|%T|%M|%N|%R'",
+            hide=True,
+            warn=True,
+        )
+        if result.ok:
+            apply_squeue_state(run, result.stdout)
+    except Exception:
+        pass
+
+    render_monitor(run, workflow_name=project_dir.name, limit=int(limit))
+
+
+def dashboard(
+    c,
+    user="",
+    port=2718,
+    bind_host="127.0.0.1",
+    remote_host="",
+    limit=25,
+    headless=False,
+):
+    dashboard_app = Path(__file__).with_name("monitor_dashboard.py")
+    project_dir = _local_project_dir()
+    effective_remote_host = remote_host or (
+        DEFAULT_HOSTS[0]["host"] if DEFAULT_HOSTS else ""
+    )
+    command = [
+        "env",
+        f"FAB_MONITOR_PROJECT_DIR={project_dir}",
+        f"FAB_MONITOR_USER={user}",
+        f"FAB_MONITOR_REMOTE_HOST={effective_remote_host}",
+        f"FAB_MONITOR_LIMIT={limit}",
+        "marimo",
+        "run",
+        str(dashboard_app),
+        "--host",
+        str(bind_host),
+        "--port",
+        str(port),
+    ]
+    if headless:
+        command.append("--headless")
+    command.extend(
+        [
+            "--",
+            "--project-dir",
+            str(project_dir),
+            "--limit",
+            str(limit),
+        ]
+    )
+    if user:
+        command.extend(["--user", user])
+    if effective_remote_host:
+        command.extend(["--remote-host", effective_remote_host])
+
+    c.run(" ".join(shlex.quote(part) for part in command))
+
+
 def queue(c):
     update_globals(c)
     c.run(f"squeue -u {_connection_user(c)}")
@@ -188,18 +269,15 @@ def create_envs(c):
 def submit(c, target=""):
     update_globals(c)
     controller_cmd = _snakemake_submit_command(target=target)
-    launch_cmd = (
-        "bash -lc "
-        + shlex.quote(
-            f"cd {shlex.quote(FOLDER)};"
-            f"mkdir -p {shlex.quote(CONTROLLER_LOG_DIR)};"
-            'controller_log="log/slurm/controller-$(date +%Y%m%dT%H%M%S).log";'
-            f"nohup bash -lc {shlex.quote(controller_cmd)} "
-            '> "$controller_log" 2>&1 < /dev/null &'
-            'controller_pid=$!;'
-            'printf "Started Snakemake controller PID %s\\nLog: %s\\n" '
-            '"$controller_pid" "$controller_log"'
-        )
+    launch_cmd = "bash -lc " + shlex.quote(
+        f"cd {shlex.quote(FOLDER)};"
+        f"mkdir -p {shlex.quote(CONTROLLER_LOG_DIR)};"
+        'controller_log="log/slurm/controller-$(date +%Y%m%dT%H%M%S).log";'
+        f"nohup bash -lc {shlex.quote(controller_cmd)} "
+        '> "$controller_log" 2>&1 < /dev/null &'
+        "controller_pid=$!;"
+        'printf "Started Snakemake controller PID %s\\nLog: %s\\n" '
+        '"$controller_pid" "$controller_log"'
     )
     c.run(launch_cmd)
 
@@ -251,6 +329,18 @@ def _submit_task(*, hosts=None):
     return wrapped
 
 
+def _monitor_task(*, hosts=None):
+    kwargs = {"name": "monitor"}
+    if hosts is not None:
+        kwargs["hosts"] = hosts
+
+    @task(**kwargs)
+    def wrapped(c, limit=20, user=""):
+        monitor(_with_user(c, user) if user else c, limit=limit)
+
+    return wrapped
+
+
 def _cancel_task(*, hosts=None):
     kwargs = {"name": "cancel"}
     if hosts is not None:
@@ -259,6 +349,30 @@ def _cancel_task(*, hosts=None):
     @task(**kwargs)
     def wrapped(c, job_id, user=""):
         cancel(_with_user(c, user) if user else c, job_id=job_id)
+
+    return wrapped
+
+
+def _dashboard_task():
+    @task(name="dashboard")
+    def wrapped(
+        c,
+        user="",
+        port=2718,
+        bind_host="127.0.0.1",
+        remote_host="",
+        limit=25,
+        headless=False,
+    ):
+        dashboard(
+            c,
+            user=user,
+            port=port,
+            bind_host=bind_host,
+            remote_host=remote_host,
+            limit=limit,
+            headless=headless,
+        )
 
     return wrapped
 
@@ -283,17 +397,19 @@ def register_tasks(
     namespace,
     *,
     project_name,
+    project_dir=None,
     include=(),
     fixvideos_pattern="dat/**/*.avi",
     annotate_hosts=None,
 ):
-    configure_project(project_name)
+    configure_project(project_name, project_dir=project_dir)
 
     task_names = set(include)
     remote_hosts = DEFAULT_HOSTS
 
     remote_tasks = {
         "queue": _simple_task(queue, name="queue", hosts=remote_hosts),
+        "monitor": _monitor_task(hosts=remote_hosts),
         "create_envs": _simple_task(
             create_envs, name="create_envs", hosts=remote_hosts
         ),
@@ -304,6 +420,7 @@ def register_tasks(
     }
     local_tasks = {
         "annotate": _simple_task(annotate, name="annotate", hosts=annotate_hosts),
+        "dashboard": _dashboard_task(),
         "fixvideos": _fixvideos_task(fixvideos_pattern),
         "fixdaq": _fixdaq_task("dat/**/*daq.zarr"),
     }
