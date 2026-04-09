@@ -23,4 +23,4 @@ rule pb_speed:
 - DAQ metadata is loaded from `dat/{session}/{session}_daq.log`
 - traces are aligned to song-driven stimulus onsets and flattened to `(trials * flies, time)`
 - trace rows are ordered in fly-major blocks: all trials for fly 1, then all trials for fly 2, etc.
-- the playlist CSV includes the DAQ metadata aligned to detected events, plus `onset_times` and `offset_times`, duplicated to the same `(trials * flies)` row order
+- the playlist CSV includes `sessionname`, `videoname`, `chamber_id`, the DAQ metadata aligned to detected events, and `onset_times`/`offset_times`, duplicated to the same `(trials * flies)` row order

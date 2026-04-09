@@ -4,6 +4,7 @@ import ast
 import datetime as dt
 import json
 import os
+import re
 from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
 
@@ -210,6 +211,26 @@ def expand_playlist_for_flies(playlist: pd.DataFrame, fly_count: int) -> pd.Data
     return pd.concat([playlist] * fly_count, ignore_index=True)
 
 
+def chamber_ids_from_tracks(track_path: Path, fly_count: int) -> list[str]:
+    import h5py
+
+    with h5py.File(track_path, "r") as handle:
+        raw_names = handle["track_names"][:]
+
+    chamber_ids = []
+    for raw_name in raw_names[:fly_count]:
+        track_name = raw_name.decode("utf-8") if isinstance(raw_name, bytes) else str(raw_name)
+        match = re.search(r"chamber\d+", track_name)
+        chamber_ids.append(match.group(0) if match else track_name)
+
+    if len(chamber_ids) != fly_count:
+        raise ValueError(
+            f"Expected {fly_count} track names in {track_path}, found {len(chamber_ids)}"
+        )
+
+    return chamber_ids
+
+
 # import snakemake
 # session = "localhost-20260408_094901"
 # video = "localhost-20260408_094901_2"
@@ -253,6 +274,7 @@ def main():
         speed, time_axis, onset_times, prefix=prefix, duration=duration
     )
     fly_count = traces.shape[2]
+    chamber_ids = chamber_ids_from_tracks(track_path, fly_count)
     traces = flatten_traces_by_fly(traces)
     rel_time = np.arange(-prefix, duration, dtype=float) / fs
 
@@ -270,7 +292,11 @@ def main():
 
     playlist["onset_times"] = onset_times
     playlist["offset_times"] = offset_times
+    trial_count = len(playlist)
     playlist = expand_playlist_for_flies(playlist, fly_count)
+    playlist.insert(0, "sessionname", session)
+    playlist.insert(1, "videoname", video)
+    playlist.insert(2, "chamber_id", np.repeat(chamber_ids, trial_count))
     playlist = normalize_dataframe_for_csv(playlist)
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
