@@ -15,13 +15,6 @@ This repository contains shared Snakemake workflow code, wrapper rules, and Fabr
 
 - `README.md`
   - user/admin setup notes and high-level usage
-- `scripts/main.smk`
-  - main Snakemake workflow logic in this repo
-  - discovers inputs like `dat/{dir}/{dir}.mp4`
-  - reads analysis config from `dat/{dir}/{dir}_analysis.yaml`
-  - maps enabled jobs to outputs in `res/{dir}/...`
-- `scripts/._main.smk`
-  - ignore; macOS artifact
 - `profiles/rosa/config.yaml`
   - Snakemake workflow profile used for cluster submission on `rosa`
 - `src/fab_commands/`
@@ -51,11 +44,12 @@ This repository contains shared Snakemake workflow code, wrapper rules, and Fabr
   - project root on cluster: `/fs/s6k/groups/agauneu/#Data/<project>/`
   - workflow profile: `../snakemake-workflows/profiles/rosa`
   - shared cluster env: `/fs/s6k/groups/agauneu/#Data/snakemake-workflows/.envs/ncb`
+  - the project-local `Snakefile`; `fab submit` does not pass `--snakefile`
 
 ## Important path assumptions
 
-- `scripts/main.smk` assumes the current working directory is the project folder, not this repo root.
-- It expects project-local paths like:
+- Snakemake execution happens from the project folder, not this repo root.
+- Project folders provide the `Snakefile` and project-local paths like:
   - `dat/<recording>/...`
   - `res/<recording>/...`
   - `log/slurm/...`
