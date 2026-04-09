@@ -2,6 +2,16 @@
 
 This repository contains shared Snakemake workflow code, wrapper rules, and Fabric commands used from experiment/project folders under `/Volumes/agauneu/#Data`.
 
+## Keep this file current
+
+- If you discover repository-specific information that is likely to matter for future tasks, update this `AGENTS.md` as part of the same job.
+- Record durable facts such as:
+  - changes in how code should be run, debugged, or validated
+  - important code structure, entry points, path assumptions, or environment constraints
+  - workflow conventions that are easy to miss but affect correct edits
+- Prefer updating or replacing outdated guidance instead of adding contradictory notes.
+- Do not add transient task notes, one-off debugging observations, or temporary workarounds unless they have become a stable part of the workflow.
+
 ## Preferred environment
 
 - Use the local conda environment `fab` for Codex work:

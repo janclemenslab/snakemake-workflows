@@ -35,6 +35,114 @@ SORTABLE_COLUMNS = {
     "node_or_reason": "node_or_reason",
     "log_file": "log_file",
 }
+LOG_BROWSER_CSS = """
+@keyframes fab-monitor-spin {
+    to { transform: rotate(360deg); }
+}
+
+.fab-monitor-loading-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 1200;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+    background: rgba(15, 23, 42, 0.38);
+}
+
+.fab-monitor-loading-window {
+    width: min(28rem, 96vw);
+    border: 1px solid #cbd5e1;
+    border-radius: 1rem;
+    background: white;
+    box-shadow: 0 24px 80px rgba(15, 23, 42, 0.22);
+    padding: 1rem 1.25rem;
+}
+
+.fab-monitor-spinner {
+    width: 1.5rem;
+    height: 1.5rem;
+    border-radius: 999px;
+    border: 3px solid #cbd5e1;
+    border-top-color: #0f766e;
+    animation: fab-monitor-spin 0.8s linear infinite;
+    flex: none;
+}
+
+.fab-monitor-log-tabs {
+    display: flex;
+    gap: 0.5rem;
+    overflow-x: auto;
+    padding-bottom: 0.25rem;
+}
+
+.fab-monitor-log-tab {
+    min-width: 12rem;
+    border: 1px solid #cbd5e1;
+    border-radius: 0.85rem;
+    background: #f8fafc;
+    padding: 0.75rem 0.9rem;
+    text-align: left;
+    transition: border-color 120ms ease, background-color 120ms ease, box-shadow 120ms ease;
+}
+
+.fab-monitor-log-tab.is-active {
+    border-color: #0f766e;
+    background: #ecfeff;
+    box-shadow: inset 0 0 0 1px rgba(15, 118, 110, 0.12);
+}
+
+.fab-monitor-log-panel {
+    display: none;
+}
+
+.fab-monitor-log-panel.is-active {
+    display: block;
+}
+
+.fab-monitor-log-pre {
+    width: 100%;
+    overflow: auto;
+    border-radius: 0.75rem;
+    border: 1px solid #cbd5e1;
+    padding: 0.875rem;
+    white-space: pre-wrap;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 12px;
+    line-height: 1.5;
+    background: white;
+}
+"""
+LOG_BROWSER_SCRIPT = """
+window.fabMonitorDashboard = window.fabMonitorDashboard || {
+  showLoading() {
+    const container = document.getElementById('modal-container');
+    const template = document.getElementById('job-modal-loading-template');
+    if (!container || !template) return;
+    container.innerHTML = template.innerHTML;
+  },
+  closeTransientModal() {
+    const container = document.getElementById('modal-container');
+    if (!container) return;
+    container.innerHTML = '';
+  },
+  selectLogTab(rootId, tabId) {
+    const root = document.getElementById(rootId);
+    if (!root) return;
+    root.querySelectorAll('[data-log-tab]').forEach((button) => {
+      const active = button.dataset.tabId === tabId;
+      button.classList.toggle('is-active', active);
+      button.setAttribute('aria-selected', active ? 'true' : 'false');
+    });
+    root.querySelectorAll('[data-log-panel]').forEach((panel) => {
+      const active = panel.dataset.tabId === tabId;
+      panel.classList.toggle('is-active', active);
+      panel.hidden = !active;
+    });
+  }
+};
+"""
 
 
 def _env_int(name: str, default: int, *, minimum: int = 0) -> int:
@@ -335,6 +443,40 @@ def _summary(run, queue_warning: str, selected_log: str):
     return Card(*blocks, body_cls="space-y-2 py-3")  # noqa: F405
 
 
+def _job_modal_loading_template():
+    return Div(  # noqa: F405
+        Div(
+            Div(
+                Button(  # noqa: F405
+                    "Close",
+                    submit=False,
+                    cls=(ButtonT.ghost, ButtonT.sm),  # noqa: F405
+                    onclick="window.fabMonitorDashboard.closeTransientModal();",
+                ),
+                cls="flex justify-end",
+            ),
+            Div(
+                Span(cls="fab-monitor-spinner", aria_hidden="true"),  # noqa: F405
+                Div(
+                    P("Loading logs", cls="text-base font-semibold"),
+                    P(
+                        "Fetching controller, rule, and SLURM log output.",
+                        cls="text-sm opacity-70",
+                    ),
+                    cls="space-y-1",
+                ),
+                cls="flex items-center gap-3",
+                role="status",
+                aria_live="polite",
+            ),
+            cls="fab-monitor-loading-window space-y-3",
+            onclick="event.stopPropagation();",
+        ),
+        cls="fab-monitor-loading-overlay",
+        onclick="window.fabMonitorDashboard.closeTransientModal();",
+    )
+
+
 def _log_link(row: dict[str, str]):
     if row["log_file"] == "-":
         return CodeSpan("-", cls="text-xs")  # noqa: F405
@@ -343,6 +485,7 @@ def _log_link(row: dict[str, str]):
         href="#",
         cls="font-mono text-xs hover:underline",
         title=row["log_file"],
+        onclick="window.fabMonitorDashboard.showLoading();",
         hx_get=f"/job-modal?smk_jobid={row['smk_jobid']}",
         hx_target="#modal-container",
         hx_swap="innerHTML",
@@ -478,24 +621,135 @@ def _jobs_table(run, limit: int, page: int, sort_by: str, sort_dir: str):
     )
 
 
-def _log_card(title: str, subtitle: str, content: str, *, cls: str = ""):
-    return Card(  # noqa: F405
-        Pre(  # noqa: F405
-            content,
-            cls="w-full overflow-auto rounded border p-3",
-            style=(
-                "height: 82vh; min-height: 82vh; overflow: auto; "
-                "white-space: pre-wrap; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; "
-                "font-size: 12px; line-height: 1.5;"
+def _log_viewer_height_style(content: str) -> str:
+    line_count = max(1, len(content.splitlines()))
+    estimated_rem = max(12.0, min(42.0, 8.0 + (line_count * 0.22)))
+    return f"height: min(72vh, {estimated_rem:.1f}rem); min-height: 12rem; max-height: 72vh;"
+
+
+def _log_source_kind(path: Path) -> str:
+    return "SLURM log" if "/log/slurm/" in str(path).replace("\\", "/") else "Rule log"
+
+
+def _build_log_sources(run, row: dict[str, str], job) -> list[dict[str, str]]:
+    sources = []
+    for title, content in controller_job_log_context(
+        run.controller_log,
+        job,
+        max_lines=200,
+        max_chars=40000,
+    ):
+        sources.append(
+            {
+                "title": title,
+                "subtitle": str(run.controller_log),
+                "content": content,
+                "kind": "Controller",
+                "tone_cls": "border border-sky-200 bg-sky-50",
+            }
+        )
+
+    for path in resolve_log_paths(PROJECT_DIR, row["log"]):
+        sources.append(
+            {
+                "title": path.name,
+                "subtitle": str(path),
+                "content": read_log_tail(path, max_lines=250, max_chars=40000),
+                "kind": _log_source_kind(path),
+                "tone_cls": "",
+            }
+        )
+
+    return sources
+
+
+def _tab_label(title: str, seen_labels: dict[str, int]) -> str:
+    count = seen_labels.get(title, 0) + 1
+    seen_labels[title] = count
+    if count == 1:
+        return title
+    return f"{title} {count}"
+
+
+def _log_browser(log_sources: list[dict[str, str]], *, smk_jobid: str):
+    if not log_sources:
+        return Card(  # noqa: F405
+            P("No readable log files for this job.", cls="text-sm"),
+            cls="border border-amber-300 bg-amber-50",
+        )
+
+    root_id = f"job-log-tabs-{smk_jobid}"
+    label_counts: dict[str, int] = {}
+    buttons = []
+    panels = []
+
+    for index, source in enumerate(log_sources, start=1):
+        tab_id = f"{root_id}-tab-{index}"
+        active = index == 1
+        label = _tab_label(source["title"], label_counts)
+        line_count = len(source["content"].splitlines())
+        buttons.append(
+            Button(  # noqa: F405
+                Div(
+                    P(label, cls="text-sm font-medium leading-tight"),
+                    P(
+                        f"{source['kind']} | {line_count} lines",
+                        cls="text-xs opacity-70",
+                    ),
+                    cls="space-y-1",
+                ),
+                submit=False,
+                cls=f"fab-monitor-log-tab{' is-active' if active else ''}",
+                role="tab",
+                aria_selected="true" if active else "false",
+                title=source["subtitle"],
+                data_log_tab="true",
+                data_tab_id=tab_id,
+                onclick=f"window.fabMonitorDashboard.selectLogTab('{root_id}', '{tab_id}');",
+            )
+        )
+        panels.append(
+            Div(  # noqa: F405
+                Card(
+                    Pre(  # noqa: F405
+                        source["content"],
+                        cls="fab-monitor-log-pre",
+                        style=_log_viewer_height_style(source["content"]),
+                    ),
+                    header=DivFullySpaced(  # noqa: F405
+                        Div(
+                            P(source["title"], cls="text-sm font-medium"),
+                            P(source["subtitle"], cls="text-xs opacity-70 break-all"),
+                            cls="space-y-1",
+                        ),
+                        P(f"{line_count} lines", cls="text-xs opacity-70 whitespace-nowrap"),
+                    ),
+                    body_cls="space-y-3",
+                    cls=source["tone_cls"],
+                ),
+                cls=f"fab-monitor-log-panel{' is-active' if active else ''}",
+                data_log_panel="true",
+                data_tab_id=tab_id,
+                hidden=not active,
+            )
+        )
+
+    return Div(  # noqa: F405
+        Div(
+            Div(
+                P("Log Sources", cls="text-xs font-medium uppercase tracking-wide opacity-60"),
+                P(
+                    f"{len(log_sources)} sources available. Select a tab to switch logs.",
+                    cls="text-sm opacity-75",
+                ),
+                cls="space-y-1",
             ),
+            Div(*buttons, cls="fab-monitor-log-tabs"),
+            cls="sticky top-0 z-10 space-y-3 border-b border-slate-200 bg-white/95 pb-3 backdrop-blur",
         ),
-        header=Div(
-            P(title, cls="text-sm font-medium"),
-            P(subtitle, cls="text-xs opacity-70 break-all"),
-            cls="space-y-1",
-        ),
-        body_cls="space-y-3",
-        cls=cls,
+        Div(*panels, cls="space-y-3"),
+        id=root_id,
+        cls="space-y-3",
     )
 
 
@@ -546,9 +800,12 @@ def index(
     controller_log = _selected_log_path(controller_log)
 
     return Title(f"Snakemake Monitor | {PROJECT_DIR.name}"), Container(  # noqa: F405
+        Style(LOG_BROWSER_CSS),  # noqa: F405
+        Script(LOG_BROWSER_SCRIPT),  # noqa: F405
         _controls(controller_log, user, remote_host, limit, page, refresh, sort_by, sort_dir),
         _dashboard_shell(controller_log, user, remote_host, limit, page, refresh, sort_by, sort_dir),
         Div(id="modal-container"),  # noqa: F405
+        Div(_job_modal_loading_template(), id="job-modal-loading-template", hidden=True),  # noqa: F405
         cls="space-y-3 py-3",
     )
 
@@ -618,39 +875,6 @@ def job_modal(
     if row is None or job is None:
         return Div()  # noqa: F405
 
-    log_cards = []
-    for title, content in controller_job_log_context(
-        run.controller_log,
-        job,
-        max_lines=200,
-        max_chars=40000,
-    ):
-        log_cards.append(
-            _log_card(
-                title,
-                str(run.controller_log),
-                content,
-                cls="border border-sky-200 bg-sky-50",
-            )
-        )
-
-    for path in resolve_log_paths(PROJECT_DIR, row["log"]):
-        log_cards.append(
-            _log_card(
-                path.name,
-                str(path),
-                read_log_tail(path, max_lines=250, max_chars=40000),
-            )
-        )
-
-    if not log_cards:
-        log_cards = [
-            Card(
-                P("No readable log files for this job.", cls="text-sm"),
-                cls="border border-amber-300 bg-amber-50",
-            )
-        ]
-
     header = Div(
         H3(row["rule"], cls="text-lg font-semibold"),  # noqa: F405
         Div(
@@ -663,7 +887,7 @@ def job_modal(
     )
 
     return Modal(  # noqa: F405
-        *log_cards,
+        _log_browser(_build_log_sources(run, row, job), smk_jobid=smk_jobid),
         header=header,
         footer=Div(
             ModalCloseButton("Close", cls=(ButtonT.secondary, "static"), submit=False),  # noqa: F405
