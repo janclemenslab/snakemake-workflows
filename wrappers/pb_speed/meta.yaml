@@ -1,6 +1,7 @@
 name: pb_speed
-description: Compute stimulus-aligned speed traces from merged SLEAP tracks and save them as NPZ files.
+description: Compute stimulus-aligned speed traces from merged SLEAP tracks, save flattened fly-major traces as NPZ files, and export aligned playlist metadata as CSV.
 input:
   - '*_sleap.h5': merged full-frame SLEAP tracks (h5)
 output:
-  - '*_spd.npz': stimulus-aligned speed traces and DAQ metadata (npz)
+  - '*_spd.npz': stimulus-aligned speed traces flattened to (trials * flies, time) in fly-major order (npz)
+  - '*_playlist.csv': event-aligned DAQ playlist metadata with onset and offset times, duplicated to match the flattened traces (csv)

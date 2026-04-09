@@ -195,12 +195,19 @@ def normalize_log_value(value):
     return value
 
 
-def dataframe_to_npz_kwargs(frame: pd.DataFrame) -> dict[str, np.ndarray]:
-    kwargs = {}
-    for column in frame.columns:
-        values = [normalize_log_value(value) for value in frame[column]]
-        kwargs[column] = np.asarray(values)
-    return kwargs
+def normalize_dataframe_for_csv(frame: pd.DataFrame) -> pd.DataFrame:
+    return frame.apply(lambda column: column.map(normalize_log_value))
+
+
+def flatten_traces_by_fly(traces: np.ndarray) -> np.ndarray:
+    traces = np.asarray(traces, dtype=float)
+    return traces.transpose((2, 0, 1)).reshape(-1, traces.shape[1])
+
+
+def expand_playlist_for_flies(playlist: pd.DataFrame, fly_count: int) -> pd.DataFrame:
+    if fly_count <= 0:
+        return playlist.iloc[0:0].copy()
+    return pd.concat([playlist] * fly_count, ignore_index=True)
 
 
 # import snakemake
@@ -213,6 +220,7 @@ def dataframe_to_npz_kwargs(frame: pd.DataFrame) -> dict[str, np.ndarray]:
 def main():
     track_path = Path(str(snakemake.input.tracks)).resolve()  # noqa: F821
     output_path = Path(str(snakemake.output.speed)).resolve()  # noqa: F821
+    playlist_path = Path(str(snakemake.output.playlist)).resolve()  # noqa: F821
 
     params = DEFAULTS.copy()
     params.update(dict(snakemake.params))  # noqa: F821
@@ -244,24 +252,31 @@ def main():
     traces = extract_aligned_traces(
         speed, time_axis, onset_times, prefix=prefix, duration=duration
     )
+    fly_count = traces.shape[2]
+    traces = flatten_traces_by_fly(traces)
     rel_time = np.arange(-prefix, duration, dtype=float) / fs
 
     print(f"Detected {len(onset_times)} stimulus events.")
     print(f"Saving traces with shape {traces.shape} to {output_path}")
 
-    metadata = pd.DataFrame(index=np.arange(len(onset_times)))
+    playlist = pd.DataFrame(index=np.arange(len(onset_times)))
     if log_path.exists():
         logs = parse_log_file(log_path).reset_index(drop=True)
-        metadata = metadata.join(logs.reindex(metadata.index))
+        playlist = playlist.join(logs.reindex(playlist.index))
     else:
         print(
             f"DAQ log not found, saving speed traces without log metadata: {log_path}"
         )
 
-    metadata["onset_times"] = onset_times
-    metadata["offset_times"] = offset_times
+    playlist["onset_times"] = onset_times
+    playlist["offset_times"] = offset_times
+    playlist = expand_playlist_for_flies(playlist, fly_count)
+    playlist = normalize_dataframe_for_csv(playlist)
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
+    playlist_path.parent.mkdir(parents=True, exist_ok=True)
+    print(f"Saving playlist with {len(playlist)} rows to {playlist_path}")
+    playlist.to_csv(playlist_path, index=False)
     np.savez(
         output_path,
         traces=traces,
@@ -269,7 +284,6 @@ def main():
         source_tracks=str(track_path),
         session=session,
         video=video,
-        **dataframe_to_npz_kwargs(metadata),
     )
 
 

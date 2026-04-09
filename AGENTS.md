@@ -66,6 +66,7 @@ This repository contains shared Snakemake workflow code, wrapper rules, and Fabr
   - `workflow/analysis_profiles/default.yaml`
   - `workflow/analysis_profiles/default_sleap_boxes.yaml`
 - Those `workflow/analysis_profiles/...` files are outside this repo and belong to the project/workflow data directory.
+- `playback/workflow/snakefile` is self-contained for YAML/default-parameter loading and no longer depends on `../../snakemake-workflows/scripts/main.smk`.
 
 ## Wrapper conventions
 
@@ -74,6 +75,8 @@ This repository contains shared Snakemake workflow code, wrapper rules, and Fabr
 - For local analysis/debugging, load helper functions by reading the file and stripping the trailing `main()` call, or run the wrapper through Snakemake-compatible code paths.
 - When changing wrapper behavior, keep `environment.yaml` and `meta.yaml` aligned with the wrapper inputs/outputs/params.
 - Prefer validating wrappers against real files under `/Volumes/agauneu/#Data/...`.
+- If a project Snakefile cannot be evaluated locally because a shared include is missing, validate the wrapper with a minimal one-rule Snakefile that points directly at the wrapper and uses concrete absolute input/output paths.
+- For wrapper smoke tests, write outputs under a project `debug/` directory so local validation does not overwrite canonical `res/` artifacts.
 
 ## Local development notes
 
@@ -82,6 +85,11 @@ This repository contains shared Snakemake workflow code, wrapper rules, and Fabr
 - For quick repo inspection:
   - use `rg` for code/config search
   - use `conda run -n fab python ...` for Python-based validation
+- `conda run -n fab snakemake ...` works for local dry-runs and wrapper smoke tests.
+- A reliable local wrapper validation pattern is:
+  - create a minimal temporary Snakefile for the wrapper
+  - run `conda run -n fab snakemake -s /absolute/path/to/test.smk -n --cores 1`
+  - then run the same command without `-n` against isolated debug outputs
 
 ## Coding guidance for this repo
 
