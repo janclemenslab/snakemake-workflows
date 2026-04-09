@@ -116,6 +116,26 @@ def controller_logs(project_dir: Path) -> list[Path]:
     return logs
 
 
+def _merge_log_values(*values: str) -> str:
+    parts: list[str] = []
+    seen: set[str] = set()
+    for value in values:
+        if not value or value == "-":
+            continue
+        for raw_part in value.split(","):
+            cleaned = raw_part.strip()
+            cleaned = re.sub(
+                r"\s*\(check log file\(s\) for error details\)\s*$",
+                "",
+                cleaned,
+            )
+            if not cleaned or cleaned in seen:
+                continue
+            seen.add(cleaned)
+            parts.append(cleaned)
+    return ", ".join(parts)
+
+
 def parse_controller_log(path: Path) -> ControllerRun:
     run = ControllerRun(controller_log=path)
     current_job: dict[str, str] | None = None
@@ -141,7 +161,7 @@ def parse_controller_log(path: Path) -> ControllerRun:
             if "external_jobid" in error_fields:
                 job.slurm_jobid = error_fields["external_jobid"]
             if "log" in error_fields:
-                job.log = error_fields["log"]
+                job.log = _merge_log_values(job.log, error_fields["log"])
         message = error_fields.get("message") or error_fields.get("rule")
         if message:
             run.errors.append(message)
@@ -200,7 +220,7 @@ def parse_controller_log(path: Path) -> ControllerRun:
                 job.wildcards = current_job.get("wildcards", job.wildcards)
                 job.input = current_job.get("input", job.input)
                 job.output = current_job.get("output", job.output)
-                job.log = current_job.get("log", job.log)
+                job.log = _merge_log_values(job.log, current_job.get("log", ""))
                 job.benchmark = current_job.get("benchmark", job.benchmark)
                 if job.kind == "localrule":
                     job.status = "running"
@@ -379,6 +399,7 @@ def resolve_log_paths(project_dir: Path, log_value: str) -> list[Path]:
         return []
 
     paths: list[Path] = []
+    seen: set[Path] = set()
     for raw_part in log_value.split(","):
         cleaned = raw_part.strip()
         cleaned = re.sub(r"\s*\(check log file\(s\) for error details\)\s*$", "", cleaned)
@@ -387,6 +408,9 @@ def resolve_log_paths(project_dir: Path, log_value: str) -> list[Path]:
         path = Path(cleaned)
         if not path.is_absolute():
             path = project_dir / path
+        if path in seen:
+            continue
+        seen.add(path)
         paths.append(path)
     return paths
 
