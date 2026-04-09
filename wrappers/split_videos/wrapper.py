@@ -331,34 +331,34 @@ def crop_video_region(
     width = x1 - x0
     height = y1 - y0
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    with tempfile.NamedTemporaryFile(suffix=output_path.suffix, delete=False) as handle:
-        temp_output = Path(handle.name)
-    cmd = [
-        "ffmpeg",
-        "-y" if force else "-n",
-        "-i",
-        str(video_path),
-        "-vf",
-        f"crop={width}:{height}:{x0}:{y0}",
-        "-an",
-        "-c:v",
-        "libx264",
-        "-crf",
-        "18",
-        "-preset",
-        "fast",
-        str(temp_output),
-    ]
-    try:
+    with tempfile.TemporaryDirectory() as tmpdir:
+        temp_output = Path(tmpdir) / output_path.name
+        cmd = [
+            "ffmpeg",
+            "-y" if force else "-n",
+            "-i",
+            str(video_path),
+            "-vf",
+            f"crop={width}:{height}:{x0}:{y0}",
+            "-an",
+            "-c:v",
+            "libx264",
+            "-crf",
+            "18",
+            "-preset",
+            "fast",
+            str(temp_output),
+        ]
         subprocess.run(
             cmd, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
         )
+        if not temp_output.exists() or temp_output.stat().st_size == 0:
+            raise RuntimeError(
+                f"ffmpeg created an empty crop for {video_path} -> {output_path}."
+            )
         if force and output_path.exists():
             output_path.unlink()
         shutil.move(str(temp_output), str(output_path))
-    finally:
-        if temp_output.exists():
-            temp_output.unlink()
 
 
 def chamber_record_from_manifest(manifest: dict, chamber_index: int) -> dict:
