@@ -22,6 +22,11 @@ _FINISH_RE = re.compile(r"Finished jobid: (\d+) \(Rule: ([^)]+)\)")
 _PROGRESS_RE = re.compile(r"(\d+) of (\d+) steps \((\d+)%\) done")
 _ERROR_RULE_RE = re.compile(r"^Error in rule ([^:]+):$")
 _SLURM_RUN_ID_RE = re.compile(r"^SLURM run ID: (.+)$")
+_DISPLAY_LOG_PREFIXES = (
+    "INFO:snakemake.logging:",
+    "WARNING:snakemake.logging:",
+    "ERROR:snakemake.logging:",
+)
 
 
 @dataclass
@@ -386,24 +391,185 @@ def resolve_log_paths(project_dir: Path, log_value: str) -> list[Path]:
     return paths
 
 
+def _normalize_display_lines(lines: Iterable[str]) -> list[str]:
+    normalized: list[str] = []
+    previous_line: str | None = None
+    for raw_line in lines:
+        line = raw_line.rstrip()
+        if line.startswith(_DISPLAY_LOG_PREFIXES):
+            continue
+        if line.startswith("/user/") and "bind:" in line:
+            continue
+        if previous_line is not None and line == previous_line:
+            continue
+        if not line and previous_line == "":
+            continue
+        normalized.append(line)
+        previous_line = line
+    return normalized
+
+
+def format_log_text(
+    text: str,
+    *,
+    source: str | Path,
+    note: str = "",
+    max_lines: int = 300,
+    max_chars: int = 50000,
+    normalize: bool = True,
+) -> str:
+    lines = text.splitlines()
+    if normalize:
+        lines = _normalize_display_lines(lines)
+
+    tail_lines = lines[-max_lines:]
+    tail = "\n".join(tail_lines)
+    if len(tail) > max_chars:
+        tail = tail[-max_chars:]
+
+    header_lines = [f"# {source}"]
+    if note:
+        header_lines.append(f"# {note}")
+    if len(lines) > max_lines:
+        header_lines.append(f"# Showing last {max_lines} of {len(lines)} lines.")
+
+    header = "\n".join(header_lines) + "\n\n"
+    return header + tail
+
+
+def _block_field_value(block_lines: Iterable[str], field_name: str) -> str:
+    normalized_field = field_name.replace("-", "_")
+    for line in block_lines:
+        match = _FIELD_RE.match(line)
+        if not match:
+            continue
+        key, value = match.groups()
+        if key.replace("-", "_") == normalized_field:
+            return value
+    return ""
+
+
+def _collect_indented_block(lines: list[str], start: int) -> tuple[list[str], int]:
+    block = [lines[start]]
+    index = start + 1
+    while index < len(lines):
+        line = lines[index]
+        if line.startswith("    "):
+            block.append(line)
+            index += 1
+            continue
+        if not line.strip():
+            block.append(line)
+            index += 1
+            continue
+        break
+    return block, index
+
+
+def controller_job_log_context(
+    controller_log: Path,
+    job: JobRecord,
+    *,
+    max_sections: int = 4,
+    max_lines: int = 200,
+    max_chars: int = 30000,
+) -> list[tuple[str, str]]:
+    if not controller_log.exists():
+        return []
+
+    try:
+        lines = controller_log.read_text(errors="replace").splitlines()
+    except Exception as exc:  # pragma: no cover - best effort viewer
+        return [
+            (
+                "Controller context",
+                format_log_text(
+                    f"Unable to read file: {exc}",
+                    source=controller_log,
+                    note=f"Filtered controller context for Snakemake job {job.snakemake_id}",
+                    max_lines=max_lines,
+                    max_chars=max_chars,
+                    normalize=False,
+                ),
+            )
+        ]
+
+    raw_sections: list[tuple[str, list[str]]] = []
+    index = 0
+    while index < len(lines):
+        stripped = lines[index].strip()
+
+        if _RULE_RE.match(stripped):
+            block, next_index = _collect_indented_block(lines, index)
+            if _block_field_value(block, "jobid") == job.snakemake_id:
+                section = list(block)
+                index = next_index
+                while index < len(lines):
+                    current_line = lines[index]
+                    current_stripped = current_line.strip()
+                    if _RULE_RE.match(current_stripped) or _ERROR_RULE_RE.match(current_stripped):
+                        break
+                    submit_match = _SUBMIT_RE.search(current_stripped)
+                    finish_match = _FINISH_RE.search(current_stripped)
+                    section.append(current_line)
+                    index += 1
+                    if submit_match and submit_match.group(1) == job.snakemake_id:
+                        break
+                    if finish_match and finish_match.group(1) == job.snakemake_id:
+                        break
+                raw_sections.append(("Controller events", section))
+                continue
+            index = next_index
+            continue
+
+        if _ERROR_RULE_RE.match(stripped):
+            block, next_index = _collect_indented_block(lines, index)
+            error_jobid = _block_field_value(block, "jobid")
+            external_jobid = _block_field_value(block, "external_jobid")
+            if error_jobid == job.snakemake_id or (
+                job.slurm_jobid and external_jobid == job.slurm_jobid
+            ):
+                raw_sections.append(("Controller error", block))
+            index = next_index
+            continue
+
+        index += 1
+
+    sections: list[tuple[str, str]] = []
+    seen_contents: set[str] = set()
+    for title, section_lines in raw_sections:
+        normalized_text = "\n".join(_normalize_display_lines(section_lines)).strip()
+        if not normalized_text or normalized_text in seen_contents:
+            continue
+        seen_contents.add(normalized_text)
+        sections.append(
+            (
+                title,
+                format_log_text(
+                    normalized_text,
+                    source=controller_log,
+                    note=f"{title} for Snakemake job {job.snakemake_id}",
+                    max_lines=max_lines,
+                    max_chars=max_chars,
+                    normalize=False,
+                ),
+            )
+        )
+        if len(sections) >= max_sections:
+            break
+    return sections
+
+
 def read_log_tail(path: Path, *, max_lines: int = 300, max_chars: int = 50000) -> str:
     if not path.exists():
         return f"{path}\n\nFile not found."
 
     try:
-        lines = path.read_text(errors="replace").splitlines()
+        text = path.read_text(errors="replace")
     except Exception as exc:  # pragma: no cover - best effort viewer
         return f"{path}\n\nUnable to read file: {exc}"
 
-    tail = "\n".join(lines[-max_lines:])
-    if len(tail) > max_chars:
-        tail = tail[-max_chars:]
-    header = f"# {path}\n"
-    if len(lines) > max_lines:
-        header += f"# Showing last {max_lines} of {len(lines)} lines.\n\n"
-    else:
-        header += "\n"
-    return header + tail
+    return format_log_text(text, source=path, max_lines=max_lines, max_chars=max_chars)
 
 
 def render_monitor(run: ControllerRun, *, workflow_name: str, limit: int = 20) -> None:
