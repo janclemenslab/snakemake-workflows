@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from html import escape
 import os
 from pathlib import Path
 import sys
@@ -116,11 +117,253 @@ LOG_BROWSER_CSS = """
 """
 LOG_BROWSER_SCRIPT = """
 window.fabMonitorDashboard = window.fabMonitorDashboard || {
+  pollPausedUntil: 0,
+  stateOrder: ['running', 'pending', 'submitted', 'finished', 'failed'],
+  collectDashboardValues() {
+    const values = {};
+    ['controls-form', 'jobs-filter-form'].forEach((formId) => {
+      const form = document.getElementById(formId);
+      if (!form) return;
+      new FormData(form).forEach((value, key) => {
+        values[key] = value;
+      });
+    });
+    return values;
+  },
+  refreshDashboardShell() {
+    if (typeof htmx === 'undefined') return;
+    const target = document.getElementById('dashboard-shell');
+    if (!target) return;
+    htmx.ajax('GET', '/dashboard-shell', {
+      target: '#dashboard-shell',
+      swap: 'outerHTML',
+      values: this.collectDashboardValues()
+    });
+  },
   showLoading() {
     const container = document.getElementById('modal-container');
     const template = document.getElementById('job-modal-loading-template');
     if (!container || !template) return;
     container.innerHTML = template.innerHTML;
+  },
+  pausePolling(ms = 8000) {
+    this.pollPausedUntil = Math.max(this.pollPausedUntil, Date.now() + ms);
+  },
+  shouldPoll() {
+    return Date.now() >= this.pollPausedUntil;
+  },
+  jobRows() {
+    return Array.from(document.querySelectorAll('#jobs-card tbody tr[data-job-row="true"]'));
+  },
+  sortStateValues(values) {
+    const unique = Array.from(new Set(values.filter(Boolean)));
+    unique.sort((left, right) => {
+      const leftIndex = this.stateOrder.indexOf(left);
+      const rightIndex = this.stateOrder.indexOf(right);
+      if (leftIndex !== -1 || rightIndex !== -1) {
+        const normalizedLeft = leftIndex === -1 ? Number.MAX_SAFE_INTEGER : leftIndex;
+        const normalizedRight = rightIndex === -1 ? Number.MAX_SAFE_INTEGER : rightIndex;
+        if (normalizedLeft !== normalizedRight) {
+          return normalizedLeft - normalizedRight;
+        }
+      }
+      return left.localeCompare(right);
+    });
+    return unique;
+  },
+  sortTextValues(values) {
+    return Array.from(new Set(values.filter(Boolean))).sort((left, right) =>
+      left.localeCompare(right, undefined, { sensitivity: 'base' })
+    );
+  },
+  setSelectOptions(select, allLabel, values, selectedValue) {
+    if (!select) return '';
+    const nextSelected = values.includes(selectedValue) ? selectedValue : '';
+    const optionSignature = JSON.stringify([[ '', allLabel ], ...values.map((value) => [value, value])]);
+    if (select.dataset.optionSignature !== optionSignature) {
+      select.innerHTML = '';
+      select.appendChild(new Option(allLabel, ''));
+      values.forEach((value) => {
+        select.appendChild(new Option(value, value));
+      });
+      select.dataset.optionSignature = optionSignature;
+    }
+    select.value = nextSelected;
+    return nextSelected;
+  },
+  syncJobsFilterOptions() {
+    const rows = this.jobRows();
+    const stateSelect = document.getElementById('state_filter');
+    const ruleSelect = document.getElementById('rule_filter');
+    if (!stateSelect || !ruleSelect) {
+      return { state: '', rule: '' };
+    }
+
+    let stateValue = stateSelect.value || '';
+    let ruleValue = ruleSelect.value || '';
+
+    const statesForRule = ruleValue
+      ? rows.filter((row) => row.dataset.rule === ruleValue).map((row) => row.dataset.baseState)
+      : rows.map((row) => row.dataset.baseState);
+    stateValue = this.setSelectOptions(
+      stateSelect,
+      'All states',
+      this.sortStateValues(statesForRule),
+      stateValue
+    );
+
+    const rulesForState = stateValue
+      ? rows.filter((row) => row.dataset.baseState === stateValue).map((row) => row.dataset.rule)
+      : rows.map((row) => row.dataset.rule);
+    ruleValue = this.setSelectOptions(
+      ruleSelect,
+      'All rules',
+      this.sortTextValues(rulesForState),
+      ruleValue
+    );
+
+    const adjustedStatesForRule = ruleValue
+      ? rows.filter((row) => row.dataset.rule === ruleValue).map((row) => row.dataset.baseState)
+      : rows.map((row) => row.dataset.baseState);
+    stateValue = this.setSelectOptions(
+      stateSelect,
+      'All states',
+      this.sortStateValues(adjustedStatesForRule),
+      stateValue
+    );
+
+    const adjustedRulesForState = stateValue
+      ? rows.filter((row) => row.dataset.baseState === stateValue).map((row) => row.dataset.rule)
+      : rows.map((row) => row.dataset.rule);
+    ruleValue = this.setSelectOptions(
+      ruleSelect,
+      'All rules',
+      this.sortTextValues(adjustedRulesForState),
+      ruleValue
+    );
+
+    const clearButton = document.getElementById('jobs-clear-filters');
+    if (clearButton) {
+      clearButton.hidden = !(stateValue || ruleValue);
+    }
+
+    return { state: stateValue, rule: ruleValue };
+  },
+  renderJobsTable({ resetPage = false } = {}) {
+    const jobsCard = document.getElementById('jobs-card');
+    if (!jobsCard) return;
+
+    const pageInput = document.getElementById('page');
+    const limitInput = document.getElementById('limit');
+    if (resetPage && pageInput) {
+      pageInput.value = '1';
+    }
+
+    const { state, rule } = this.syncJobsFilterOptions();
+    const rows = this.jobRows();
+    const matchedRows = rows.filter((row) => {
+      if (state && row.dataset.baseState !== state) return false;
+      if (rule && row.dataset.rule !== rule) return false;
+      return true;
+    });
+
+    let limit = parseInt(limitInput?.value || '100', 10);
+    if (!Number.isFinite(limit) || limit < 1) {
+      limit = 100;
+    }
+
+    let page = parseInt(pageInput?.value || '1', 10);
+    if (!Number.isFinite(page) || page < 1) {
+      page = 1;
+    }
+
+    const pageCount = Math.max(1, Math.ceil(matchedRows.length / limit));
+    if (page > pageCount) {
+      page = pageCount;
+    }
+    if (pageInput) {
+      pageInput.value = String(page);
+    }
+
+    const startIndex = matchedRows.length ? (page - 1) * limit : 0;
+    const endIndex = Math.min(startIndex + limit, matchedRows.length);
+    const visibleRows = new Set(matchedRows.slice(startIndex, endIndex));
+
+    rows.forEach((row) => {
+      row.hidden = !visibleRows.has(row);
+    });
+
+    const summary = document.getElementById('jobs-summary-text');
+    if (summary) {
+      const text = matchedRows.length
+        ? `Showing ${startIndex + 1}-${endIndex} of ${matchedRows.length}`
+        : 'Showing 0 jobs';
+      summary.textContent =
+        matchedRows.length === rows.length ? text : `${text} | ${rows.length} total`;
+    }
+
+    const pageStatus = document.getElementById('jobs-page-status');
+    if (pageStatus) {
+      pageStatus.textContent = `Page ${page} of ${pageCount} | ${matchedRows.length} jobs`;
+    }
+
+    const prevButton = document.getElementById('jobs-prev-page');
+    if (prevButton) {
+      prevButton.disabled = page <= 1 || matchedRows.length === 0;
+    }
+    const nextButton = document.getElementById('jobs-next-page');
+    if (nextButton) {
+      nextButton.disabled = page >= pageCount || matchedRows.length === 0;
+    }
+
+    document.querySelectorAll('[data-page-size-button]').forEach((button) => {
+      const isActive = button.dataset.pageSizeButton === String(limit);
+      button.classList.toggle('uk-btn-primary', isActive);
+      button.classList.toggle('uk-btn-ghost', !isActive);
+    });
+
+    const emptyState = document.getElementById('jobs-empty-state');
+    if (emptyState) {
+      emptyState.hidden = matchedRows.length > 0;
+    }
+
+    const tableWrapper = document.getElementById('jobs-table-wrapper');
+    if (tableWrapper) {
+      tableWrapper.hidden = matchedRows.length === 0;
+    }
+  },
+  applyJobsFilters() {
+    this.pausePolling(2500);
+    this.closeTransientModal();
+    this.renderJobsTable({ resetPage: true });
+  },
+  clearJobsFilters() {
+    this.pausePolling(2500);
+    this.closeTransientModal();
+    const stateSelect = document.getElementById('state_filter');
+    const ruleSelect = document.getElementById('rule_filter');
+    if (stateSelect) stateSelect.value = '';
+    if (ruleSelect) ruleSelect.value = '';
+    this.renderJobsTable({ resetPage: true });
+  },
+  changeJobsPage(delta) {
+    this.pausePolling(2500);
+    this.closeTransientModal();
+    const pageInput = document.getElementById('page');
+    if (pageInput) {
+      const currentPage = parseInt(pageInput.value || '1', 10);
+      pageInput.value = String(Math.max(1, currentPage + delta));
+    }
+    this.renderJobsTable();
+  },
+  setJobsPageSize(size) {
+    this.pausePolling(2500);
+    this.closeTransientModal();
+    const limitInput = document.getElementById('limit');
+    const pageInput = document.getElementById('page');
+    if (limitInput) limitInput.value = String(size);
+    if (pageInput) pageInput.value = '1';
+    this.renderJobsTable();
   },
   closeTransientModal() {
     const container = document.getElementById('modal-container');
@@ -142,6 +385,18 @@ window.fabMonitorDashboard = window.fabMonitorDashboard || {
     });
   }
 };
+
+if (!window.fabMonitorDashboardBound) {
+  window.fabMonitorDashboardBound = true;
+  document.addEventListener('DOMContentLoaded', () => {
+    window.fabMonitorDashboard.renderJobsTable();
+  });
+  document.body.addEventListener('htmx:afterSwap', (event) => {
+    if (event.target && event.target.id === 'dashboard-shell') {
+      window.fabMonitorDashboard.renderJobsTable();
+    }
+  });
+}
 """
 
 
@@ -158,6 +413,8 @@ DEFAULT_REFRESH = _env_int("FAB_MONITOR_REFRESH", 5, minimum=0)
 DEFAULT_HOST = os.environ.get("FAB_MONITOR_BIND_HOST", "127.0.0.1").strip() or "127.0.0.1"
 DEFAULT_PORT = _env_int("FAB_MONITOR_PORT", 2718, minimum=1)
 PAGE_SIZE_OPTIONS = [50, 100, 200]
+DASHBOARD_FORM_INCLUDE = "#controls-form, #jobs-filter-form"
+DASHBOARD_REQUEST_SYNC = "#dashboard-shell:replace"
 
 
 app, rt = fast_app(  # noqa: F405
@@ -196,6 +453,14 @@ def _normalize_refresh(refresh: int | str | None) -> int:
     return max(0, min(value, 60))
 
 
+def _normalize_state_filter(state_filter: str | None) -> str:
+    return (state_filter or "").strip().lower()
+
+
+def _normalize_rule_filter(rule_filter: str | None) -> str:
+    return (rule_filter or "").strip()
+
+
 def _selected_log_path(controller_log: str | None) -> str:
     logs = _available_logs()
     if controller_log:
@@ -207,7 +472,13 @@ def _selected_log_path(controller_log: str | None) -> str:
     return ""
 
 
-def _load_run(controller_log: str, user: str, remote_host: str):
+def _load_run(
+    controller_log: str,
+    user: str,
+    remote_host: str,
+    *,
+    smk_jobid: str = "",
+):
     selected_log = _selected_log_path(controller_log)
     if not selected_log:
         return None, "", ""
@@ -216,14 +487,19 @@ def _load_run(controller_log: str, user: str, remote_host: str):
     queue_warning = ""
     queue_user = (user or "").strip()
     queue_host = (remote_host or "").strip()
+    needs_live_slurm = (
+        run.job_needs_live_slurm_state(smk_jobid)
+        if smk_jobid
+        else run.needs_live_slurm_state()
+    )
 
-    if queue_user and queue_host:
+    if needs_live_slurm and queue_user and queue_host:
         squeue_output = fetch_squeue_output(user=queue_user, host=queue_host)
         if squeue_output:
             apply_squeue_state(run, squeue_output)
         else:
             queue_warning = "Could not fetch live SLURM state."
-    elif queue_user and not queue_host:
+    elif needs_live_slurm and queue_user and not queue_host:
         queue_warning = "Set an SSH host to enrich jobs with live SLURM state."
 
     return run, queue_warning, selected_log
@@ -258,6 +534,37 @@ def _sorted_rows(run, sort_by: str, sort_dir: str):
     return rows
 
 
+def _row_base_state(row: dict[str, str]) -> str:
+    return row["state"].split("/", maxsplit=1)[0].strip().lower()
+
+
+def _available_states(rows: list[dict[str, str]]) -> list[str]:
+    preferred_order = ["running", "pending", "submitted", "finished", "failed"]
+    states = {_row_base_state(row) for row in rows if row["state"] and row["state"] != "-"}
+    ordered = [state for state in preferred_order if state in states]
+    ordered.extend(sorted(state for state in states if state not in preferred_order))
+    return ordered
+
+
+def _available_rules(rows: list[dict[str, str]]) -> list[str]:
+    rules = {row["rule"] for row in rows if row["rule"] and row["rule"] != "-"}
+    return sorted(rules, key=str.casefold)
+
+
+def _filter_rows(
+    rows: list[dict[str, str]],
+    *,
+    state_filter: str,
+    rule_filter: str,
+) -> list[dict[str, str]]:
+    filtered = rows
+    if state_filter:
+        filtered = [row for row in filtered if _row_base_state(row) == state_filter]
+    if rule_filter:
+        filtered = [row for row in filtered if row["rule"] == rule_filter]
+    return filtered
+
+
 def _warning_card(title: str, messages: list[str], tone: str):
     tone_cls = {
         "warn": "border-orange-300 bg-orange-50",
@@ -268,6 +575,19 @@ def _warning_card(title: str, messages: list[str], tone: str):
         header=H4(title, cls="text-sm font-semibold"),  # noqa: F405
         cls=f"h-full border {tone_cls}",
         body_cls="space-y-3",
+    )
+
+
+def _state_badge(state: str):
+    base_state = state.split("/", maxsplit=1)[0].strip().lower()
+    tone_cls = {
+        "failed": "border-red-300 bg-red-50 text-red-700",
+        "error": "border-red-300 bg-red-50 text-red-700",
+        "finished": "border-emerald-300 bg-emerald-50 text-emerald-700",
+    }.get(base_state, "border-slate-300 bg-slate-50 text-slate-700")
+    return CodeSpan(  # noqa: F405
+        state,
+        cls=f"rounded border px-2 py-0.5 text-xs font-medium {tone_cls}",
     )
 
 
@@ -283,10 +603,6 @@ def _controls(
     controls_open: bool = False,
 ):
     logs = list(reversed(_available_logs()))
-    run_options = [
-        Option(path.name, value=str(path), selected=str(path) == controller_log)  # noqa: F405
-        for path in logs
-    ]
 
     refresh_options = [
         ("Off", 0),
@@ -295,6 +611,86 @@ def _controls(
         ("10s", 10),
         ("30s", 30),
     ]
+
+    def native_select(
+        *,
+        select_id: str,
+        name: str,
+        options: list[tuple[str, str, bool]],
+        title: str,
+        class_name: str,
+        style: str = "",
+        disabled: bool = False,
+    ):
+        options_html = "".join(
+            f'<option value="{escape(value, quote=True)}"'
+            f'{" selected" if selected else ""}>{escape(label)}</option>'
+            for value, label, selected in options
+        )
+        attrs = {
+            "id": select_id,
+            "name": name,
+            "class": class_name,
+            "title": title,
+            "onfocus": "window.fabMonitorDashboard.pausePolling(12000);",
+            "onpointerdown": "window.fabMonitorDashboard.pausePolling(12000);",
+            "onchange": (
+                "window.fabMonitorDashboard.pausePolling(2500);"
+                "window.fabMonitorDashboard.closeTransientModal();"
+                "document.getElementById('page').value='1';"
+            ),
+            "hx-get": "/dashboard-shell",
+            "hx-trigger": "change",
+            "hx-target": "#dashboard-shell",
+            "hx-swap": "outerHTML",
+            "hx-include": DASHBOARD_FORM_INCLUDE,
+            "hx-sync": DASHBOARD_REQUEST_SYNC,
+        }
+        if style:
+            attrs["style"] = style
+        if disabled:
+            attrs["disabled"] = "disabled"
+        attr_html = " ".join(
+            f'{key}="{escape(value, quote=True)}"' for key, value in attrs.items()
+        )
+        return NotStr(f"<select {attr_html}>{options_html}</select>")  # noqa: F405
+
+    def native_input(
+        *,
+        input_id: str,
+        name: str,
+        value: str,
+        placeholder: str,
+        title: str,
+        class_name: str = "uk-input uk-form-small w-full",
+    ):
+        attrs = {
+            "id": input_id,
+            "name": name,
+            "type": "text",
+            "value": value,
+            "placeholder": placeholder,
+            "title": title,
+            "autocomplete": "off",
+            "class": class_name,
+            "onfocus": "window.fabMonitorDashboard.pausePolling(12000);",
+            "onpointerdown": "window.fabMonitorDashboard.pausePolling(12000);",
+            "onchange": (
+                "window.fabMonitorDashboard.pausePolling(2500);"
+                "window.fabMonitorDashboard.closeTransientModal();"
+                "document.getElementById('page').value='1';"
+            ),
+            "hx-get": "/dashboard-shell",
+            "hx-trigger": "change",
+            "hx-target": "#dashboard-shell",
+            "hx-swap": "outerHTML",
+            "hx-include": DASHBOARD_FORM_INCLUDE,
+            "hx-sync": DASHBOARD_REQUEST_SYNC,
+        }
+        attr_html = " ".join(
+            f'{key}="{escape(attr_value, quote=True)}"' for key, attr_value in attrs.items()
+        )
+        return NotStr(f"<input {attr_html}>")  # noqa: F405
 
     run_select = Div(
         DivFullySpaced(  # noqa: F405
@@ -310,29 +706,63 @@ def _controls(
                 hx_include="#controls-form",
             ),
         ),
-        Select(  # noqa: F405
-            *run_options,
-            id="controller_log",
+        native_select(
+            select_id="controller_log",
             name="controller_log",
-            placeholder="No controller logs",
-            searchable=False,
-            disabled=not run_options,
+            options=[
+                (str(path), path.name, str(path) == controller_log) for path in logs
+            ],
+            title="Select controller log",
+            class_name="uk-select uk-form-small w-full",
+            style="width: 100%;",
+            disabled=not logs,
         ),
-        cls="space-y-2",
+        cls="space-y-2 min-w-0",
+        style="flex: 2.2 1 24rem; min-width: 18rem;",
+    )
+
+    user_input = Div(
+        P("User", cls="text-sm font-medium"),
+        native_input(
+            input_id="user",
+            name="user",
+            value=user,
+            placeholder="abcd1234",
+            title="SSH username for live SLURM state",
+            class_name="uk-input uk-form-small w-full",
+        ),
+        cls="space-y-2 min-w-0",
+        style="flex: 0.75 1 8.5rem; min-width: 8rem;",
+    )
+
+    host_input = Div(
+        P("Host", cls="text-sm font-medium"),
+        native_input(
+            input_id="remote_host",
+            name="remote_host",
+            value=remote_host,
+            placeholder="rosa.hpc.uni-oldenburg.de",
+            title="SSH host for live SLURM state",
+        ),
+        cls="space-y-2 min-w-0",
+        style="flex: 1.2 1 15rem; min-width: 12rem;",
     )
 
     refresh_select = Div(
         P("Refresh", cls="text-sm font-medium"),
-        Select(  # noqa: F405
-            *[
-                Option(label, value=str(seconds), selected=seconds == refresh)  # noqa: F405
+        native_select(
+            select_id="refresh",
+            name="refresh",
+            options=[
+                (str(seconds), label, seconds == refresh)
                 for label, seconds in refresh_options
             ],
-            id="refresh",
-            name="refresh",
-            searchable=False,
+            title="Auto-refresh interval",
+            class_name="uk-select uk-form-small",
+            style="width: 5.5rem;",
         ),
         cls="space-y-2",
+        style="flex: 0 0 5.5rem;",
     )
 
     form = Form(  # noqa: F405
@@ -340,34 +770,12 @@ def _controls(
         Input(type="hidden", id="sort_by", name="sort_by", value=sort_by),  # noqa: F405
         Input(type="hidden", id="sort_dir", name="sort_dir", value=sort_dir),  # noqa: F405
         Input(type="hidden", id="limit", name="limit", value=str(limit)),  # noqa: F405
-        Grid(  # noqa: F405
+        Div(
             run_select,
-            LabelInput("User", id="user", value=user, placeholder="abcd1234"),  # noqa: F405
-            LabelInput(  # noqa: F405
-                "Host",
-                id="remote_host",
-                value=remote_host,
-                placeholder="rosa.hpc.uni-oldenburg.de",
-            ),
+            user_input,
+            host_input,
             refresh_select,
-            Div(
-                Button(  # noqa: F405
-                    "Apply",
-                    submit=False,
-                    cls=(ButtonT.primary, ButtonT.sm),  # noqa: F405
-                    onclick="document.getElementById('page').value='1';",
-                    hx_get="/dashboard-shell",
-                    hx_target="#dashboard-shell",
-                    hx_swap="outerHTML",
-                    hx_include="#controls-form",
-                ),
-                cls="flex items-end h-full",
-            ),
-            cols_min=1,
-            cols_md=2,
-            cols_lg=3,
-            cols_xl=5,
-            cls="gap-2 items-end pt-2",
+            cls="flex flex-wrap xl:flex-nowrap gap-2 items-end pt-2",
         ),
         id="controls-form",
         cls="space-y-0",
@@ -505,30 +913,29 @@ def _sort_header(label: str, key: str, sort_by: str, sort_dir: str):
             href="#",
             cls="hover:underline whitespace-nowrap",
             onclick=(
+                "window.fabMonitorDashboard.closeTransientModal();"
                 f"document.getElementById('sort_by').value='{key}';"
                 f"document.getElementById('sort_dir').value='{next_dir}';"
             ),
             hx_get="/dashboard-shell",
             hx_target="#dashboard-shell",
             hx_swap="outerHTML",
-            hx_include="#controls-form",
+            hx_include=DASHBOARD_FORM_INCLUDE,
+            hx_sync=DASHBOARD_REQUEST_SYNC,
         )
     )
 
 
-def _pager_button(label: str, page: int, disabled: bool = False):
+def _pager_button(label: str, *, button_id: str, delta: int, disabled: bool = False):
     classes = (ButtonT.secondary, ButtonT.sm)
     if disabled:
-        return Button(label, submit=False, cls=classes, disabled=True)  # noqa: F405
+        return Button(label, submit=False, cls=classes, disabled=True, id=button_id)  # noqa: F405
     return Button(  # noqa: F405
         label,
         submit=False,
+        id=button_id,
         cls=classes,
-        onclick=f"document.getElementById('page').value='{page}';",
-        hx_get="/dashboard-shell",
-        hx_target="#dashboard-shell",
-        hx_swap="outerHTML",
-        hx_include="#controls-form",
+        onclick=f"window.fabMonitorDashboard.changeJobsPage({delta});",
     )
 
 
@@ -538,46 +945,150 @@ def _page_size_button(size: int, current: int):
         str(size),
         submit=False,
         cls=classes,
-        onclick=(
-            f"document.getElementById('limit').value='{size}';"
-            "document.getElementById('page').value='1';"
-        ),
-        hx_get="/dashboard-shell",
-        hx_target="#dashboard-shell",
-        hx_swap="outerHTML",
-        hx_include="#controls-form",
+        data_page_size_button=str(size),
+        onclick=f"window.fabMonitorDashboard.setJobsPageSize({size});",
     )
 
 
-def _jobs_table(run, limit: int, page: int, sort_by: str, sort_dir: str):
+def _jobs_filter_form(
+    rows: list[dict[str, str]],
+    *,
+    state_filter: str,
+    rule_filter: str,
+):
+    state_rows = _filter_rows(rows, state_filter="", rule_filter=rule_filter)
+    rule_rows = _filter_rows(rows, state_filter=state_filter, rule_filter="")
+
+    clear_button = Button(  # noqa: F405
+        "Clear",
+        submit=False,
+        id="jobs-clear-filters",
+        hidden=not (state_filter or rule_filter),
+        cls=(ButtonT.ghost, ButtonT.sm),  # noqa: F405
+        onclick="window.fabMonitorDashboard.clearJobsFilters();",
+    )
+
+    def native_select(
+        *,
+        select_id: str,
+        name: str,
+        width_cls: str,
+        title: str,
+        options: list[tuple[str, str, bool]],
+    ):
+        options_html = "".join(
+            f'<option value="{escape(value, quote=True)}"'
+            f'{" selected" if selected else ""}>{escape(label)}</option>'
+            for value, label, selected in options
+        )
+        attrs = {
+            "id": select_id,
+            "name": name,
+            "class": f"uk-select uk-form-small {width_cls}",
+            "title": title,
+            "onfocus": "window.fabMonitorDashboard.pausePolling(12000);",
+            "onpointerdown": "window.fabMonitorDashboard.pausePolling(12000);",
+            "onchange": (
+                "window.fabMonitorDashboard.pausePolling(2500);"
+                "window.fabMonitorDashboard.closeTransientModal();"
+                "document.getElementById('page').value='1';"
+                "window.fabMonitorDashboard.applyJobsFilters();"
+            ),
+        }
+        attr_html = " ".join(
+            f'{key}="{escape(value, quote=True)}"'
+            for key, value in attrs.items()
+        )
+        return NotStr(f"<select {attr_html}>{options_html}</select>")  # noqa: F405
+
+    state_select = native_select(
+        select_id="state_filter",
+        name="state_filter",
+        width_cls="w-36",
+        title="Filter by state",
+        options=[("", "All states", not state_filter)]
+        + [(state, state, state == state_filter) for state in _available_states(state_rows)],
+    )
+    rule_select = native_select(
+        select_id="rule_filter",
+        name="rule_filter",
+        width_cls="min-w-44 max-w-72",
+        title="Filter by rule",
+        options=[("", "All rules", not rule_filter)]
+        + [(rule, rule, rule == rule_filter) for rule in _available_rules(rule_rows)],
+    )
+
+    return Form(  # noqa: F405
+        state_select,
+        rule_select,
+        clear_button,
+        id="jobs-filter-form",
+        cls="flex items-center gap-2 flex-nowrap overflow-x-auto",
+    )
+
+
+def _jobs_table(
+    run,
+    limit: int,
+    page: int,
+    sort_by: str,
+    sort_dir: str,
+    state_filter: str,
+    rule_filter: str,
+):
     if run is None:
         return Div()  # noqa: F405
 
-    rows = _sorted_rows(run, sort_by, sort_dir)
-    if not rows:
-        return Card(P("No jobs were parsed from the selected controller log.", cls="text-sm"))  # noqa: F405
+    all_rows = _sorted_rows(run, sort_by, sort_dir)
+    filtered_rows = _filter_rows(
+        all_rows,
+        state_filter=state_filter,
+        rule_filter=rule_filter,
+    )
+    filter_form = _jobs_filter_form(
+        all_rows,
+        state_filter=state_filter,
+        rule_filter=rule_filter,
+    )
+    if not all_rows:
+        return Card(  # noqa: F405
+            P("No jobs were parsed from the selected controller log.", cls="text-sm"),
+            header=DivFullySpaced(  # noqa: F405
+                H3("Jobs", cls="text-base font-semibold"),  # noqa: F405
+                filter_form,
+            ),
+            body_cls="space-y-0 py-2",
+        )
 
-    total_rows = len(rows)
+    total_rows = len(filtered_rows)
     page_count = max(1, (total_rows + limit - 1) // limit)
     current_page = min(max(1, page), page_count)
     start = (current_page - 1) * limit
     stop = start + limit
-    visible_rows = rows[start:stop]
+    visible_jobids = {
+        row["smk_jobid"]
+        for row in filtered_rows[start:stop]
+    }
 
     body = []
-    for row in visible_rows:
+    for row in all_rows:
         body.append(
             Tr(  # noqa: F405
-                Td(CodeSpan(row["state"]), cls="whitespace-nowrap text-xs"),  # noqa: F405
+                Td(_state_badge(row["state"]), cls="whitespace-nowrap"),  # noqa: F405
                 Td(row["rule"], cls="font-medium"),
                 Td(row["wildcards"], cls="max-w-xl text-sm"),
                 Td(row["elapsed"], cls="whitespace-nowrap text-sm"),
                 Td(row["node_or_reason"], cls="max-w-sm text-sm"),
                 Td(_log_link(row), cls="max-w-sm"),
+                data_job_row="true",
+                data_base_state=_row_base_state(row),
+                data_rule=row["rule"],
+                data_smk_jobid=row["smk_jobid"],
+                hidden=row["smk_jobid"] not in visible_jobids,
             )
         )
 
-    return Card(  # noqa: F405
+    table_body = (
         Div(
             Table(  # noqa: F405
                 Thead(  # noqa: F405
@@ -592,16 +1103,24 @@ def _jobs_table(run, limit: int, page: int, sort_by: str, sort_dir: str):
                 ),
                 Tbody(*body),  # noqa: F405
             ),
+            id="jobs-table-wrapper",
+            hidden=not filtered_rows,
             cls="overflow-x-auto",
-        ),
+        )
+    )
+
+    return Card(  # noqa: F405
+        table_body,
+        P("No jobs match the current filters.", id="jobs-empty-state", cls="text-sm", hidden=bool(filtered_rows)),
         footer=DivFullySpaced(  # noqa: F405
             Div(
-                _pager_button("Previous", current_page - 1, disabled=current_page <= 1),
+                _pager_button("Previous", button_id="jobs-prev-page", delta=-1, disabled=current_page <= 1),
                 P(
                     f"Page {current_page} of {page_count} | {total_rows} jobs",
                     cls="text-xs opacity-70",
+                    id="jobs-page-status",
                 ),
-                _pager_button("Next", current_page + 1, disabled=current_page >= page_count),
+                _pager_button("Next", button_id="jobs-next-page", delta=1, disabled=current_page >= page_count),
                 cls="flex items-center gap-2 flex-wrap",
             ),
             Div(
@@ -611,12 +1130,23 @@ def _jobs_table(run, limit: int, page: int, sort_by: str, sort_dir: str):
             ),
         ),
         header=DivFullySpaced(  # noqa: F405
-            H3("Jobs", cls="text-base font-semibold"),  # noqa: F405
-            P(
-                f"Showing {start + 1}-{min(stop, total_rows)} of {total_rows}",
-                cls="text-xs opacity-70",
+            Div(
+                H3("Jobs", cls="text-base font-semibold"),  # noqa: F405
+                P(
+                    (
+                        f"Showing {start + 1}-{min(stop, total_rows)} of {total_rows}"
+                        if filtered_rows
+                        else "Showing 0 jobs"
+                    )
+                    + (f" | {len(all_rows)} total" if total_rows != len(all_rows) else ""),
+                    cls="text-xs opacity-70",
+                    id="jobs-summary-text",
+                ),
+                cls="space-y-0.5",
             ),
+            filter_form,
         ),
+        id="jobs-card",
         body_cls="space-y-0 py-2",
     )
 
@@ -762,21 +1292,25 @@ def _dashboard_shell(
     refresh: int,
     sort_by: str,
     sort_dir: str,
+    state_filter: str,
+    rule_filter: str,
 ):
     run, queue_warning, selected_log = _load_run(controller_log, user, remote_host)
     poll_attrs = {}
-    if refresh > 0:
+    if refresh > 0 and (run is None or not run.is_terminal()):
         poll_attrs = {
             "hx_get": "/dashboard-shell",
-            "hx_trigger": f"load, every {refresh}s",
+            "hx_trigger": f"every {refresh}s",
             "hx_target": "this",
             "hx_swap": "outerHTML",
-            "hx_include": "#controls-form",
+            "hx_include": DASHBOARD_FORM_INCLUDE,
+            "hx_sync": DASHBOARD_REQUEST_SYNC,
+            "hx-on::before-request": "if (!window.fabMonitorDashboard.shouldPoll()) event.preventDefault();",
         }
 
     return Div(  # noqa: F405
         _summary(run, queue_warning, selected_log),
-        _jobs_table(run, limit, page, sort_by, sort_dir),
+        _jobs_table(run, limit, page, sort_by, sort_dir, state_filter, rule_filter),
         id="dashboard-shell",
         cls="space-y-2",
         **poll_attrs,
@@ -793,17 +1327,32 @@ def index(
     refresh: int = DEFAULT_REFRESH,
     sort_by: str = "",
     sort_dir: str = "asc",
+    state_filter: str = "",
+    rule_filter: str = "",
 ):
     limit = _normalize_limit(limit)
     page = _normalize_page(page)
     refresh = _normalize_refresh(refresh)
     controller_log = _selected_log_path(controller_log)
+    state_filter = _normalize_state_filter(state_filter)
+    rule_filter = _normalize_rule_filter(rule_filter)
 
     return Title(f"Snakemake Monitor | {PROJECT_DIR.name}"), Container(  # noqa: F405
         Style(LOG_BROWSER_CSS),  # noqa: F405
         Script(LOG_BROWSER_SCRIPT),  # noqa: F405
         _controls(controller_log, user, remote_host, limit, page, refresh, sort_by, sort_dir),
-        _dashboard_shell(controller_log, user, remote_host, limit, page, refresh, sort_by, sort_dir),
+        _dashboard_shell(
+            controller_log,
+            user,
+            remote_host,
+            limit,
+            page,
+            refresh,
+            sort_by,
+            sort_dir,
+            state_filter,
+            rule_filter,
+        ),
         Div(id="modal-container"),  # noqa: F405
         Div(_job_modal_loading_template(), id="job-modal-loading-template", hidden=True),  # noqa: F405
         cls="space-y-3 py-3",
@@ -820,6 +1369,8 @@ def controls(
     refresh: int = DEFAULT_REFRESH,
     sort_by: str = "",
     sort_dir: str = "asc",
+    state_filter: str = "",
+    rule_filter: str = "",
     controls_open: int = 0,
 ):
     return _controls(
@@ -845,6 +1396,8 @@ def dashboard_shell(
     refresh: int = DEFAULT_REFRESH,
     sort_by: str = "",
     sort_dir: str = "asc",
+    state_filter: str = "",
+    rule_filter: str = "",
 ):
     return _dashboard_shell(
         _selected_log_path(controller_log),
@@ -855,6 +1408,8 @@ def dashboard_shell(
         _normalize_refresh(refresh),
         sort_by,
         sort_dir,
+        _normalize_state_filter(state_filter),
+        _normalize_rule_filter(rule_filter),
     )
 
 
@@ -865,7 +1420,12 @@ def job_modal(
     user: str = DEFAULT_USER,
     remote_host: str = DEFAULT_REMOTE_HOST,
 ):
-    run, _, _ = _load_run(controller_log, user, remote_host)
+    run, _, _ = _load_run(
+        controller_log,
+        user,
+        remote_host,
+        smk_jobid=smk_jobid,
+    )
     if run is None:
         return Div()  # noqa: F405
 
