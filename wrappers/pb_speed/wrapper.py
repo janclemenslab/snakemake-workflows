@@ -12,7 +12,6 @@ os.environ.setdefault("HDF5_USE_FILE_LOCKING", "FALSE")
 
 import numpy as np
 import pandas as pd
-import scipy.ndimage
 import scipy.signal
 
 
@@ -23,9 +22,10 @@ DEFAULTS = {
     "speed_median_kernel": 5,
     "song_env_window_seconds": 0.05,
     "song_env_threshold": 1.0,
-    "stim_closing_samples": 1_001,
+    "stim_closing_samples": 5_001,
     "prefix_seconds": 5.0,
     "duration_seconds": 10.0,
+    "chamber_size_mm": 45.7,
 }
 
 
@@ -75,6 +75,31 @@ def infer_context(track_path: Path) -> tuple[Path, str, str, Path]:
     return root, session, video, log_path
 
 
+def chamber_size_px_from_record(chamber: dict) -> float:
+    bbox = chamber.get("bbox_xyxy")
+    if not isinstance(bbox, (list, tuple)) or len(bbox) != 4:
+        raise ValueError(f"Invalid chamber bbox_xyxy entry: {bbox}")
+
+    _, y0, _, y1 = (float(value) for value in bbox)
+    chamber_size_px = y1 - y0
+    if chamber_size_px <= 0:
+        raise ValueError(f"Non-positive chamber height from bbox_xyxy: {bbox}")
+
+    return chamber_size_px
+
+
+def mean_chamber_size_px(manifest_path: Path) -> float:
+    with manifest_path.open() as handle:
+        manifest = json.load(handle)
+
+    chambers = manifest.get("chambers")
+    if not isinstance(chambers, list) or not chambers:
+        raise ValueError(f"No chambers found in detections manifest: {manifest_path}")
+
+    chamber_sizes_px = [chamber_size_px_from_record(chamber) for chamber in chambers]
+    return float(np.mean(chamber_sizes_px))
+
+
 def odd_kernel_size(value: int) -> int:
     value = max(1, int(value))
     if value % 2 == 0:
@@ -82,23 +107,28 @@ def odd_kernel_size(value: int) -> int:
     return value
 
 
-def assemble_dataset(
-    root: Path,
-    session: str,
-    track_path: Path,
-    target_sampling_rate: int,
-    resample_video_data: bool,
-):
-    import xarray_behave as xb
+def close_small_gaps_1d(x: np.ndarray, max_gap: int) -> np.ndarray:
+    """Fill False gaps shorter than max_gap between True runs in a 1D array."""
+    x = np.asarray(x, dtype=bool)
+    max_gap = int(max_gap)
 
-    return xb.assemble(
-        datename=session,
-        root=str(root),
-        target_sampling_rate=target_sampling_rate,
-        resample_video_data=resample_video_data,
-        filepath_poses=str(track_path),
-        filepath_video=str(track_path),
-    )
+    if x.size == 0 or max_gap <= 0:
+        return x.copy()
+
+    padded = np.concatenate(([False], x, [False]))
+    transitions = np.diff(padded.astype(np.int8))
+    starts = np.flatnonzero(transitions == 1)
+    ends = np.flatnonzero(transitions == -1)
+
+    if starts.size <= 1:
+        return x.copy()
+
+    gaps = starts[1:] - ends[:-1]
+    out = x.copy()
+    for gap_idx in np.flatnonzero(gaps < max_gap):
+        out[ends[gap_idx] : starts[gap_idx + 1]] = True
+
+    return out
 
 
 def compute_speed(ds, median_kernel: int) -> np.ndarray:
@@ -131,13 +161,9 @@ def detect_stimulus_events(
     env = np.sqrt(np.convolve(song**2, window, mode="full"))
     env = env[win_len // 2 : win_len // 2 + song.shape[0]]
 
-    stim = scipy.ndimage.binary_closing(
-        env > env_threshold,
-        np.ones(max(1, int(stim_closing_samples)), dtype=bool),
-    )
-    stim = np.asarray(stim, dtype=bool)
+    stim = close_small_gaps_1d(env > env_threshold, stim_closing_samples)
 
-    stim_diff = np.diff(stim.astype(np.int8), prepend=0)
+    stim_diff = np.diff(stim.astype(float), prepend=0)
     stim_onsets = np.flatnonzero(stim_diff == 1)
     stim_offsets = np.flatnonzero(stim_diff == -1)
 
@@ -219,7 +245,9 @@ def chamber_ids_from_tracks(track_path: Path, fly_count: int) -> list[str]:
 
     chamber_ids = []
     for raw_name in raw_names[:fly_count]:
-        track_name = raw_name.decode("utf-8") if isinstance(raw_name, bytes) else str(raw_name)
+        track_name = (
+            raw_name.decode("utf-8") if isinstance(raw_name, bytes) else str(raw_name)
+        )
         match = re.search(r"chamber\d+", track_name)
         chamber_ids.append(match.group(0) if match else track_name)
 
@@ -240,6 +268,7 @@ def chamber_ids_from_tracks(track_path: Path, fly_count: int) -> list[str]:
 
 def main():
     track_path = Path(str(snakemake.input.tracks)).resolve()  # noqa: F821
+    manifest_path = Path(str(snakemake.input.manifest)).resolve()  # noqa: F821
     output_path = Path(str(snakemake.output.speed)).resolve()  # noqa: F821
     playlist_path = Path(str(snakemake.output.playlist)).resolve()  # noqa: F821
 
@@ -247,15 +276,29 @@ def main():
     params.update(dict(snakemake.params))  # noqa: F821
 
     root, session, video, log_path = infer_context(track_path)
+    chamber_size_mm = float(params["chamber_size_mm"])
+    chamber_size_px = mean_chamber_size_px(manifest_path)
+    pixel_size_mm = chamber_size_mm / chamber_size_px
+
     print(f"Processing merged tracks: {track_path}")
     print(f"Resolved root={root} session={session} video={video}")
+    print(f"Using detections manifest: {manifest_path}")
+    print(
+        f"Using chamber_size_mm={chamber_size_mm:.6f}, "
+        f"mean chamber_size_px={chamber_size_px:.6f}, "
+        f"pixel_size_mm={pixel_size_mm:.9f}"
+    )
 
-    ds = assemble_dataset(
-        root=root,
-        session=session,
-        track_path=track_path,
+    import xarray_behave as xb
+
+    ds = xb.assemble(
+        datename=session,
+        root=str(root),
         target_sampling_rate=int(params["target_sampling_rate"]),
         resample_video_data=bool(params["resample_video_data"]),
+        filepath_poses=str(track_path),
+        filepath_video=str(track_path),
+        pixel_size_mm=pixel_size_mm,
     )
 
     speed = compute_speed(ds, median_kernel=int(params["speed_median_kernel"]))
@@ -310,14 +353,25 @@ def main():
         source_tracks=str(track_path),
         session=session,
         video=video,
+        chamber_size_mm=chamber_size_mm,
+        chamber_size_px=chamber_size_px,
+        pixel_size_mm=pixel_size_mm,
     )
 
 
-logfile = snakemake.log[0] if snakemake.log else None  # noqa: F821
-if logfile:
-    log_path = Path(logfile)
-    log_path.parent.mkdir(parents=True, exist_ok=True)
-    with log_path.open("a") as handle, redirect_stdout(handle), redirect_stderr(handle):
+try:
+    logfile = snakemake.log[0] if snakemake.log else None  # noqa: F821
+    if logfile:
+        log_path = Path(logfile)
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+        with (
+            log_path.open("a") as handle,
+            redirect_stdout(handle),
+            redirect_stderr(handle),
+        ):
+            main()
+    else:
         main()
-else:
-    main()
+
+except:
+    pass

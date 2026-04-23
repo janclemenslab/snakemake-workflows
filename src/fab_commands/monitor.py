@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib import Path
 import re
+import shlex
 import subprocess
 from typing import Iterable
 
@@ -13,7 +14,7 @@ from rich.console import Console
 from rich.table import Table
 
 
-_RULE_RE = re.compile(r"^(localrule|rule) ([^:]+):$")
+_RULE_RE = re.compile(r"^(localrule|rule|checkpoint) ([^:]+):$")
 _FIELD_RE = re.compile(r"^\s+([A-Za-z_][\w-]*):\s*(.*)$")
 _SUBMIT_RE = re.compile(
     r"Job (\d+) has been submitted with SLURM jobid (\d+) \(log: (.+?)\)\."
@@ -27,6 +28,8 @@ _DISPLAY_LOG_PREFIXES = (
     "WARNING:snakemake.logging:",
     "ERROR:snakemake.logging:",
 )
+_ACTIVE_JOB_STATUSES = frozenset({"running", "pending", "submitted"})
+_TERMINAL_RUN_STATES = frozenset({"success", "failed"})
 
 
 @dataclass
@@ -46,6 +49,9 @@ class JobRecord:
     elapsed: str = ""
     node: str = ""
     reason: str = ""
+
+    def needs_live_slurm_state(self) -> bool:
+        return bool(self.slurm_jobid) and self.status in _ACTIVE_JOB_STATUSES
 
 
 @dataclass
@@ -94,6 +100,25 @@ class ControllerRun:
                 if job.status == "running":
                     counts["running"] += 1
         return counts
+
+    def has_active_jobs(self) -> bool:
+        return any(job.status in _ACTIVE_JOB_STATUSES for job in self.jobs.values())
+
+    def is_terminal(self) -> bool:
+        return self.state in _TERMINAL_RUN_STATES or (bool(self.jobs) and not self.has_active_jobs())
+
+    def needs_live_slurm_state(self) -> bool:
+        return not self.is_terminal() and any(
+            job.needs_live_slurm_state() for job in self.jobs.values()
+        )
+
+    def job_needs_live_slurm_state(self, snakemake_id: str) -> bool:
+        if self.is_terminal():
+            return False
+        job = self.jobs.get(snakemake_id)
+        if job is None:
+            return self.needs_live_slurm_state()
+        return job.needs_live_slurm_state()
 
 
 def latest_controller_log(project_dir: Path) -> Path | None:
@@ -341,6 +366,26 @@ def fetch_squeue_output(*, user: str, host: str = "") -> str:
     return result.stdout
 
 
+def cancel_slurm_run(*, user: str, host: str = "", run_id: str = "") -> tuple[bool, str]:
+    queue_user = user.strip()
+    queue_host = host.strip()
+    target_run_id = run_id.strip()
+    if not queue_user or not queue_host or not target_run_id:
+        return False, ""
+
+    command = f"scancel {shlex.quote(target_run_id)}"
+    try:
+        with Connection(host=queue_host, user=queue_user) as connection:
+            result = connection.run(command, hide=True, warn=True)
+    except Exception as exc:
+        return False, str(exc)
+
+    detail = (result.stderr or result.stdout or "").strip()
+    if result.ok:
+        return True, detail or f"Cancellation requested for SLURM run {target_run_id}."
+    return False, detail or f"`scancel {target_run_id}` exited with a non-zero status."
+
+
 def _job_sort_key(job: JobRecord) -> tuple[int, str, str]:
     priority = {
         "running": 0,
@@ -413,6 +458,103 @@ def resolve_log_paths(project_dir: Path, log_value: str) -> list[Path]:
         seen.add(path)
         paths.append(path)
     return paths
+
+
+def _normalize_io_path(value: str) -> str:
+    cleaned = value.strip().strip("\"'")
+    if not cleaned or cleaned in {"-", "None"}:
+        return ""
+    cleaned = cleaned.replace("\\", "/")
+    cleaned = re.sub(r"/+", "/", cleaned)
+    if cleaned.startswith("./"):
+        cleaned = cleaned[2:]
+    return cleaned
+
+
+def split_io_values(value: str) -> list[str]:
+    if not value or value == "-":
+        return []
+
+    parts: list[str] = []
+    seen: set[str] = set()
+    for raw_part in value.split(","):
+        cleaned = _normalize_io_path(raw_part)
+        if not cleaned or cleaned in seen:
+            continue
+        seen.add(cleaned)
+        parts.append(cleaned)
+    return parts
+
+
+def _rule_state(status_counts: dict[str, int]) -> str:
+    if status_counts.get("failed", 0):
+        return "failed"
+    if status_counts.get("running", 0):
+        return "running"
+    if status_counts.get("pending", 0) or status_counts.get("submitted", 0):
+        return "pending"
+    if status_counts.get("finished", 0):
+        return "finished"
+    return "unknown"
+
+
+def rule_graph_data(run: ControllerRun) -> dict[str, list[dict[str, object]]]:
+    rule_stats: dict[str, dict[str, object]] = {}
+    output_to_rules: dict[str, set[str]] = {}
+
+    for job in run.jobs.values():
+        rule = (job.rule or "").strip()
+        if not rule:
+            continue
+
+        stats = rule_stats.setdefault(
+            rule,
+            {
+                "job_count": 0,
+                "status_counts": {},
+            },
+        )
+        stats["job_count"] = int(stats["job_count"]) + 1
+
+        status = (job.status or "unknown").strip().lower()
+        status_counts = stats["status_counts"]
+        assert isinstance(status_counts, dict)
+        status_counts[status] = int(status_counts.get(status, 0)) + 1
+
+        for output_path in split_io_values(job.output):
+            producers = output_to_rules.setdefault(output_path, set())
+            producers.add(rule)
+
+    edges: set[tuple[str, str]] = set()
+    for job in run.jobs.values():
+        consumer = (job.rule or "").strip()
+        if not consumer:
+            continue
+        for input_path in split_io_values(job.input):
+            for producer in output_to_rules.get(input_path, ()):
+                if producer != consumer:
+                    edges.add((producer, consumer))
+
+    nodes = []
+    for rule in sorted(rule_stats, key=str.casefold):
+        stats = rule_stats[rule]
+        status_counts = stats["status_counts"]
+        assert isinstance(status_counts, dict)
+        nodes.append(
+            {
+                "id": rule,
+                "label": rule,
+                "job_count": int(stats["job_count"]),
+                "state": _rule_state(status_counts),
+                "status_counts": dict(sorted(status_counts.items())),
+            }
+        )
+
+    edge_list = [
+        {"source": source, "target": target}
+        for source, target in sorted(edges, key=lambda item: (item[0].casefold(), item[1].casefold()))
+    ]
+    return {"nodes": nodes, "edges": edge_list}
 
 
 def _normalize_display_lines(lines: Iterable[str]) -> list[str]:

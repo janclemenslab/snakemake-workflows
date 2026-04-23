@@ -8,6 +8,7 @@ Converts merged playback SLEAP tracks into stimulus-aligned speed traces saved a
 rule pb_speed:
     input:
         tracks="res/{session}/{video}_sleap.h5"
+        manifest="dat/{session}/{video}_fly_chambers/{video}_detections.json"
     output:
         speed="res/{session}/{video}_spd.npz"
         playlist="res/{session}/{video}_playlist.csv"
@@ -20,6 +21,7 @@ rule pb_speed:
 ## Notes
 
 - the wrapper infers `root`, `session`, and `video` directly from the merged SLEAP filename
+- `pixel_size_mm` is computed per video as `chamber_size_mm / mean(chamber_height_px)`, where `chamber_height_px` is the vertical span of each chamber's `bbox_xyxy` in the detections manifest
 - DAQ metadata is loaded from `dat/{session}/{session}_daq.log`
 - traces are aligned to song-driven stimulus onsets and flattened to `(trials * flies, time)`
 - trace rows are ordered in fly-major blocks: all trials for fly 1, then all trials for fly 2, etc.

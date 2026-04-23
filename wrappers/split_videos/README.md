@@ -17,6 +17,7 @@ checkpoint split_videos:
 ## Inputs
 
 - `input.video`: source video (`.mp4`)
+- `input.fly_chambers_txt`: optional `dat/SESSION/VIDEO_fly_chambers.txt` override with a comma-separated list of fly-positive chamber numbers
 
 ## Outputs
 
@@ -38,3 +39,4 @@ checkpoint split_videos:
 - the output directory must be next to the input video
 - the output directory name must start with the input stem, because the wrapper infers the suffix from it
 - the manifest contains one record per detected chamber and a `has_fly` flag that downstream rules can use to expand jobs dynamically
+- if `VIDEO_fly_chambers.txt` exists, the wrapper skips automatic fly detection and uses that chamber list instead

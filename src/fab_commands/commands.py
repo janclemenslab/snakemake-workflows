@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import glob
 import os
-import shlex
 
 from . import project
 
@@ -123,16 +122,7 @@ def create_envs(c):
 def submit(c, target=""):
     project.update_globals(c)
     controller_cmd = project.snakemake_submit_command(target=target)
-    launch_cmd = "bash -lc " + shlex.quote(
-        f"cd {shlex.quote(project.FOLDER)};"
-        f"mkdir -p {shlex.quote(project.CONTROLLER_LOG_DIR)};"
-        'controller_log="log/slurm/controller-$(date +%Y%m%dT%H%M%S).log";'
-        f"nohup bash -lc {shlex.quote(controller_cmd)} "
-        '> "$controller_log" 2>&1 < /dev/null &'
-        "controller_pid=$!;"
-        'printf "Started Snakemake controller PID %s\\nLog: %s\\n" '
-        '"$controller_pid" "$controller_log"'
-    )
+    launch_cmd = project.controller_launch_command(controller_cmd)
     c.run(launch_cmd)
 
 

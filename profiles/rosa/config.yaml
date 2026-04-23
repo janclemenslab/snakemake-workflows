@@ -16,6 +16,7 @@ software-deployment-method:
 conda-prefix: "/fs/s6k/groups/agauneu/#Data/snakemake-workflows/.envs"
 slurm-logdir: "log/slurm"
 slurm-keep-successful-logs: true
+slurm-requeue: true
 default-resources:
   - runtime=120
   - mem_mb=8192

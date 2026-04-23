@@ -30,6 +30,9 @@ This repository contains shared Snakemake workflow code, wrapper rules, and Fabr
 - `src/fab_commands/`
   - Fabric tasks exposed by the package
   - includes `submit`, `monitor`, `dashboard`, `queue`, `unlock`, `fixvideos`, `fixdaq`
+  - `monitor.py` parses controller logs and renders terminal summaries
+  - `monitor_dashboard.py` is the local FastHTML app behind `fab dashboard`
+  - `submission.py` builds workflow-aware dashboard submission targets
 - `wrappers/`
   - shared rule wrappers
   - current wrapper folders: `das`, `merge_splits`, `pb_speed`, `sleap`, `split_videos`
@@ -50,6 +53,15 @@ This repository contains shared Snakemake workflow code, wrapper rules, and Fabr
   - `fab monitor --user <cluster_user>`
   - `fab dashboard --user <cluster_user>`
   - `fab queue --user <cluster_user>`
+- `fab submit` launches the remote Snakemake controller in the background and writes controller logs to `log/slurm/controller-YYYYMMDDTHHMMSS.log`.
+- `fab monitor` parses the newest controller log and merges live `squeue` state when the run is still active.
+- `fab dashboard` starts a local FastHTML server with:
+  - a logs page for controller/rule/SLURM log inspection, queue-aware job tables, and DAG viewing
+  - a submit page for workflow-aware remote submission
+- Dashboard selective submit is curated for:
+  - `playback`: `detect_fly_chambers`, `merge_tracks`, `pb_speed`, `report_plots`
+  - `chainingmic`: `sleap`, `song`
+- Other workflows fall back to generic rule discovery from the Snakefile and do not yet expose curated experiment checklists in the dashboard.
 - Remote submit uses:
   - project root on cluster: `/fs/s6k/groups/agauneu/#Data/<project>/`
   - workflow profile: `../snakemake-workflows/profiles/rosa`

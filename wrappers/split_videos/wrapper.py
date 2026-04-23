@@ -36,6 +36,13 @@ def moving_average(values: np.ndarray, window: int) -> np.ndarray:
     return np.convolve(values.astype(np.float32), kernel, mode="same")
 
 
+def smooth_columns(values: np.ndarray, window: int) -> np.ndarray:
+    return np.stack(
+        [moving_average(values[:, col], window) for col in range(values.shape[1])],
+        axis=1,
+    )
+
+
 def threshold_from_profile(profile: np.ndarray, fraction: float) -> float:
     minimum = float(np.min(profile))
     maximum = float(np.max(profile))
@@ -221,8 +228,9 @@ def detect_fly_component(chamber_gray: np.ndarray) -> Component | None:
     scaled_height = max(8, chamber_height // 2)
     scaled = resize_grayscale(chamber_gray, (scaled_width, scaled_height))
 
-    # Downsampling suppresses the chamber mesh, then the local darkness response
-    # asks whether there is a fly-sized cluster of dark pixels anywhere inside.
+    # Downsampling suppresses the chamber mesh. We then subtract a per-column
+    # vertical baseline so the long chamber walls behave like background and
+    # only localized dark blobs, such as flies, remain.
     blurred = np.asarray(
         Image.fromarray(np.clip(scaled, 0, 255).astype(np.uint8)).filter(
             ImageFilter.GaussianBlur(radius=6)
@@ -230,11 +238,12 @@ def detect_fly_component(chamber_gray: np.ndarray) -> Component | None:
         dtype=np.float32,
     )
     darkness = np.maximum(0.0, blurred - scaled)
+    localized_darkness = np.maximum(0.0, darkness - smooth_columns(darkness, 31))
 
     border = 1
-    inner = darkness[border:-border, border:-border]
-    threshold = max(3.0, float(np.mean(inner) + 1.25 * np.std(inner)))
-    response = np.maximum(0.0, darkness - threshold)
+    inner = localized_darkness[border:-border, border:-border]
+    threshold = max(1.0, float(np.mean(inner) + 1.0 * np.std(inner)))
+    response = np.maximum(0.0, localized_darkness - threshold)
     response[:border, :] = 0.0
     response[-border:, :] = 0.0
     response[:, :border] = 0.0
@@ -242,7 +251,9 @@ def detect_fly_component(chamber_gray: np.ndarray) -> Component | None:
 
     score, bbox_small = max_window_sum_bbox(response, window_height=16, window_width=10)
     score_ratio = score / max(threshold, 1e-6)
-    if score < 900.0 or score_ratio < 75.0:
+    patch = response[bbox_small[1] : bbox_small[3], bbox_small[0] : bbox_small[2]]
+    max_response = float(np.max(patch)) if patch.size else 0.0
+    if score < 500.0 or score_ratio < 237.0 or max_response < 19.5:
         return None
 
     scale_x = chamber_width / float(scaled_width)
@@ -285,6 +296,24 @@ def classify_chambers(
                 detection_bbox=detection_bbox,
                 has_fly=component is not None,
                 fly_component=component,
+            )
+        )
+    return detections
+
+
+def initialize_chamber_detections(
+    chambers: Iterable[tuple[int, int, int, int]],
+    fly_chambers: set[int] | None = None,
+) -> list[ChamberDetection]:
+    detections: list[ChamberDetection] = []
+    for index, bbox in enumerate(chambers, start=1):
+        detections.append(
+            ChamberDetection(
+                index=index,
+                bbox=bbox,
+                detection_bbox=bbox,
+                has_fly=index in fly_chambers if fly_chambers is not None else False,
+                fly_component=None,
             )
         )
     return detections
@@ -368,6 +397,43 @@ def chamber_record_from_manifest(manifest: dict, chamber_index: int) -> dict:
     raise ValueError(f"Could not find chamber {chamber_index:02d} in detections manifest.")
 
 
+def optional_input_path(name: str) -> Path | None:
+    try:
+        value = getattr(snakemake.input, name)  # noqa: F821
+    except Exception:
+        return None
+
+    if value in (None, ""):
+        return None
+    if isinstance(value, (list, tuple)):
+        if not value:
+            return None
+        value = value[0]
+    return Path(str(value)).resolve()
+
+
+def read_fly_chambers_override(path: Path) -> set[int]:
+    text = path.read_text().strip()
+    if not text:
+        return set()
+
+    chambers: set[int] = set()
+    for token in text.split(","):
+        chamber_text = token.strip()
+        if not chamber_text:
+            continue
+        try:
+            chamber_index = int(chamber_text)
+        except ValueError as exc:
+            raise ValueError(
+                f"Invalid chamber index {chamber_text!r} in {path}. Expected comma-separated integers."
+            ) from exc
+        if chamber_index < 1:
+            raise ValueError(f"Invalid chamber index {chamber_index} in {path}.")
+        chambers.add(chamber_index)
+    return chambers
+
+
 def get_param(name, default=None):
     try:
         return getattr(snakemake.params, name)  # noqa: F821
@@ -423,17 +489,48 @@ def main():
             f"{min_chambers}."
         )
 
-    detections = classify_chambers(gray, chambers, detection_padding)
+    override_path = optional_input_path("fly_chambers_txt")
+    if override_path is not None and override_path.exists():
+        fly_chambers = read_fly_chambers_override(override_path)
+        invalid_chambers = sorted(
+            chamber_index
+            for chamber_index in fly_chambers
+            if chamber_index > len(chambers)
+        )
+        if invalid_chambers:
+            raise ValueError(
+                f"Override file {override_path} references chamber(s) outside detected range 1-{len(chambers)}: "
+                f"{invalid_chambers}"
+            )
+        detections = initialize_chamber_detections(chambers, fly_chambers)
+        fly_detection_mode = "override"
+    else:
+        detections = classify_chambers(gray, chambers, detection_padding)
+        fly_detection_mode = "automatic"
+
+    fly_chamber_indices = sorted(detection.index for detection in detections if detection.has_fly)
+    fly_chamber_label = ", ".join(str(index) for index in fly_chamber_indices) or "none"
+    if fly_detection_mode == "override":
+        print(
+            f"Using fly chamber override from {override_path}: {fly_chamber_label}",
+            flush=True,
+        )
+    else:
+        print(f"Auto-detected fly chambers: {fly_chamber_label}", flush=True)
+
     output_dir.mkdir(parents=True, exist_ok=True)
 
     manifest = {
         "video": str(video_path),
         "frame_shape": list(frame_rgb.shape),
         "plate_bbox_xyxy": list(plate_bbox),
+        "fly_detection_mode": fly_detection_mode,
         "num_detected_chambers": len(chambers),
         "num_fly_chambers": int(sum(d.has_fly for d in detections)),
         "chambers": [],
     }
+    if override_path is not None and override_path.exists():
+        manifest["fly_chambers_override_path"] = str(override_path)
 
     for detection in detections:
         crop_bbox = expand_bbox(detection.bbox, crop_padding, frame_width, frame_height)

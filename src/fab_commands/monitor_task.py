@@ -31,16 +31,17 @@ def run_monitor(
 
     run = parse_controller_log(controller_log)
 
-    try:
-        result = c.run(
-            f"squeue -h -u {connection_user(c)} -o '%i|%T|%M|%N|%R'",
-            hide=True,
-            warn=True,
-        )
-        if result.ok:
-            apply_squeue_state(run, result.stdout)
-    except Exception:
-        pass
+    if run.needs_live_slurm_state():
+        try:
+            result = c.run(
+                f"squeue -h -u {connection_user(c)} -o '%i|%T|%M|%N|%R'",
+                hide=True,
+                warn=True,
+            )
+            if result.ok:
+                apply_squeue_state(run, result.stdout)
+        except Exception:
+            pass
 
     render_monitor(run, workflow_name=workflow_dir.name, limit=int(limit))
 

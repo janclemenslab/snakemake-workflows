@@ -14,6 +14,13 @@ from fabric import task
 ProjectDirGetter = Callable[[], Path]
 
 
+def _browser_url(bind_host: str, port: int) -> str:
+    host = (bind_host or "").strip()
+    if not host or host in {"0.0.0.0", "::"}:
+        host = "127.0.0.1"
+    return f"http://{host}:{port}/"
+
+
 def launch_dashboard(
     c: Any,
     *,
@@ -25,12 +32,15 @@ def launch_dashboard(
     remote_host: str = "",
     limit: int = 100,
     headless: bool = False,
+    open_browser: bool = True,
+    verbose: bool = False,
 ) -> None:
     dashboard_app = Path(__file__).with_name("monitor_dashboard.py")
     workflow_dir = project_dir()
     effective_remote_host = remote_host or (
         default_hosts[0]["host"] if default_hosts else ""
     )
+    effective_open_browser = bool(open_browser) and not bool(headless)
     command = [
         "env",
         f"FAB_MONITOR_PROJECT_DIR={workflow_dir}",
@@ -39,12 +49,15 @@ def launch_dashboard(
         f"FAB_MONITOR_LIMIT={limit}",
         f"FAB_MONITOR_BIND_HOST={bind_host}",
         f"FAB_MONITOR_PORT={port}",
+        f"FAB_MONITOR_OPEN_BROWSER={1 if effective_open_browser else 0}",
+        f"FAB_MONITOR_BROWSER_URL={_browser_url(bind_host, int(port))}",
+        f"FAB_MONITOR_VERBOSE={1 if verbose else 0}",
         "python",
         str(dashboard_app),
     ]
     if headless:
         logging.info(
-            "FastHTML dashboard runs headless by default; ignoring headless=%s",
+            "Suppressing browser launch because headless=%s",
             headless,
         )
 
@@ -65,6 +78,8 @@ def build_dashboard_task(
         remote_host="",
         limit=100,
         headless=False,
+        open_browser=True,
+        verbose=False,
     ):
         launch_dashboard(
             c,
@@ -76,6 +91,8 @@ def build_dashboard_task(
             remote_host=remote_host,
             limit=limit,
             headless=headless,
+            open_browser=open_browser,
+            verbose=verbose,
         )
 
     return wrapped
