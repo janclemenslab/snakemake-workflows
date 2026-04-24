@@ -4,8 +4,11 @@ from __future__ import annotations
 
 from collections.abc import Callable, Sequence
 import logging
+import os
 from pathlib import Path
 import shlex
+import subprocess
+import sys
 from typing import Any
 
 from fabric import task
@@ -19,6 +22,12 @@ def _browser_url(bind_host: str, port: int) -> str:
     if not host or host in {"0.0.0.0", "::"}:
         host = "127.0.0.1"
     return f"http://{host}:{port}/"
+
+
+def _shell_join(parts: Sequence[str]) -> str:
+    if os.name == "nt":
+        return subprocess.list2cmdline([str(part) for part in parts])
+    return " ".join(shlex.quote(str(part)) for part in parts)
 
 
 def launch_dashboard(
@@ -41,27 +50,25 @@ def launch_dashboard(
         default_hosts[0]["host"] if default_hosts else ""
     )
     effective_open_browser = bool(open_browser) and not bool(headless)
-    command = [
-        "env",
-        f"FAB_MONITOR_PROJECT_DIR={workflow_dir}",
-        f"FAB_MONITOR_USER={user}",
-        f"FAB_MONITOR_REMOTE_HOST={effective_remote_host}",
-        f"FAB_MONITOR_LIMIT={limit}",
-        f"FAB_MONITOR_BIND_HOST={bind_host}",
-        f"FAB_MONITOR_PORT={port}",
-        f"FAB_MONITOR_OPEN_BROWSER={1 if effective_open_browser else 0}",
-        f"FAB_MONITOR_BROWSER_URL={_browser_url(bind_host, int(port))}",
-        f"FAB_MONITOR_VERBOSE={1 if verbose else 0}",
-        "python",
-        str(dashboard_app),
-    ]
+    env = {
+        "FAB_MONITOR_PROJECT_DIR": str(workflow_dir),
+        "FAB_MONITOR_USER": str(user),
+        "FAB_MONITOR_REMOTE_HOST": str(effective_remote_host),
+        "FAB_MONITOR_LIMIT": str(limit),
+        "FAB_MONITOR_BIND_HOST": str(bind_host),
+        "FAB_MONITOR_PORT": str(port),
+        "FAB_MONITOR_OPEN_BROWSER": "1" if effective_open_browser else "0",
+        "FAB_MONITOR_BROWSER_URL": _browser_url(bind_host, int(port)),
+        "FAB_MONITOR_VERBOSE": "1" if verbose else "0",
+    }
+    command = _shell_join([sys.executable, str(dashboard_app)])
     if headless:
         logging.info(
             "Suppressing browser launch because headless=%s",
             headless,
         )
 
-    c.run(" ".join(shlex.quote(part) for part in command))
+    c.run(command, env=env)
 
 
 def build_dashboard_task(
